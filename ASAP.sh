@@ -46,9 +46,12 @@ EOF
 
  
 
-while getopts "hc:s:" OPTION
+while getopts "hvc:" OPTION
 do
      case $OPTION in
+		v)
+		echo "ASAP - version beta 0.9"; exit 0
+		;;
          h)
              usage
              exit 1
