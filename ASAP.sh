@@ -3,6 +3,9 @@
 
 :<<'readme'
 15/05/2007
+Amira KRAMDI
+kramdi.a@gmail.com
+
 
 This script is written in an effort to gather the main analysis steps of ATAC-seq data.Here are the major steps:
 
@@ -19,8 +22,6 @@ IV. Peak calling
 
 readme
 
-#Here, we get the directory of this script in order to display a proper help
-#SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 #===============================================================================
 # Help setion
