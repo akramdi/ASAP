@@ -288,7 +288,7 @@ if [ ! -s $pathBowtie2 ]; then >&2 echo `file $pathBowtie2`  ; exit 1 ; fi
 echo -e "\n######################## Mappinng step" | tee -a $LOG
 
 echo "$stamp: Mapping..." | tee -a $LOG
-echo "#$pathBowtie2 -x $bowtieIndex $mappingParameters -1 $FASTQ1 -2 $FASTQ2 1> ${ID}.mapped.sam" | tee -a $LOG
+echo "$stamp: Mapping command: #$pathBowtie2 -x $bowtieIndex $mappingParameters -1 $FASTQ1 -2 $FASTQ2 1> ${ID}.mapped.sam" | tee -a $LOG
 eval "$pathBowtie2 -x $bowtieIndex $mappingParameters -1 $FASTQ1 -2 $FASTQ2 1> ${ID}.mapped.sam "
 
 
