@@ -1,12 +1,12 @@
 ===================================
-README for ASAP (v0.9)
+README for ASAP (v0.9.1)
 ===================================
-ASAP Beta version 0.9
+ASAP Beta version 0.9.1
 
 Introduction 
 ============
 
-ASAP is a flexible bioinformatic pipeline for ATAC-seq data analysis. Starting from raw ATAC-seq sequencing reads, ASAP outputs raw and filtered mapping files, coverage files (reads coverage ; tn5 insertion events coverage) and peak calling results. 
+ASAP is a flexible bioinformatic pipeline for ATAC-seq data analysis. Starting from raw ATAC-seq sequencing reads, ASAP outputs raw and filtered mapping files, coverage files (reads coverage ; tn5 insertion events coverage), fragment length distribution and peak calling results. 
 
 Overview of major steps 
 ==========================
@@ -21,6 +21,7 @@ Overview of major steps
   - Shift read pairs as described in Buenorestro et al.,2013
 - Compute read coverage
 - Compute insertion events coverage
+- Fragment length distribution
 - Peak calling
 
 ASAP is:
@@ -121,6 +122,11 @@ Coverage
 :CHRLEN:                      Chromosome info file (tab-delimited format: *<Chr name><chr length>*)
 
 
+Fragment length
+---------------
+:fragDist:                    Set to "*yes/no*" if fragment length distribution should be computed or not
+
+
 
 Peak calling
 ------------
@@ -135,7 +141,7 @@ Peak calling
 Output files
 ============
 
-ASAP outputs mapping files, coverage files and MACS2 peak calling results.
+ASAP outputs mapping files and stats, coverage files, fragment length distribution and MACS2 peak calling results.
 
 Mapping output
 ---------------
@@ -155,6 +161,13 @@ Coverage outputs
 :{sampleName}.*mis.mkdup.f3F1024.masked.shifted.ievent.tdf: Genome-wide coverage of Tn5 insertion events
 
 :{sampleName}.*mis.mkdup.f3F1024.masked.shifted.ievent.bam: Contains Tn5 insertion events. Basically, instead of showing reads, only the position corresponding to Tn5 insertion event are shown)
+
+
+Fragment length distribution
+----------------------------
+:TLEN.{sampleName}.f66.txt: Counts/frequencies of fragments length
+:TLEN.{sampleName}.f66.txt: Plot of fragment length distribution
+
 
 Peak calling outputs 
 --------------------
