@@ -78,19 +78,6 @@ stamp="@$date"
 
 
 #===============================================================================
-# Create tmp dir and LOGS
-#===============================================================================
-
-LOCALTMP=/localtmp/tmp$RANDOM
-if [ ! -d $LOCALTMP ]; then mkdir $LOCALTMP ; fi 
-
-function finish {
-rm -rf $LOCALTMP
-}
-trap finish EXIT 
-#LOG file is created after getting samplename/projcetName
-
-#===============================================================================
 # Parse configuration file to extract parameters 
 #===============================================================================
 
@@ -166,6 +153,24 @@ pathMACS2=${config[pathMACS2]}
 pathBowtie2=${config[pathBowtie2]}
 pathToJava=${config[pathToJava]}
 pathToPicardJar=${config[pathToPicardJar]}
+
+
+#===============================================================================
+# Create tmp dir and LOG file
+#===============================================================================
+
+LOCALTMP=$OUTDIR/tmp$RANDOM
+if [ ! -d $LOCALTMP ]; then mkdir $LOCALTMP ; fi 
+
+function finish {
+rm -rf $LOCALTMP
+}
+trap finish EXIT 
+
+#Create log file where all commands are kept. Comes in handy in case of debugging
+LOGDIR=$OUTDIR/logs_${ID} ; if [ ! -d $LOGDIR ] ; then mkdir $LOGDIR ;fi 
+LOG=$LOGDIR/commands_ASAP_run_${ID}.log
+touch $LOG
 
 #================================== Check some parameters and issue warnings/errors
 
@@ -269,13 +274,6 @@ cat $LOCALTMP/tmp.conf
 echo "++++++++++++++++++++++"
 echo -e "END PARAMETERS SUMMARY"
 echo -e "++++++++++++++++++++++\n"
-
-
-#IMPORTANT: Create log file where all commands are kept. Comes in handy in case of debugging
-LOGDIR=$OUTDIR/logs_${ID} ; if [ ! -d $LOGDIR ] ; then mkdir $LOGDIR ;fi 
-LOG=$LOGDIR/commands_ASAP_run_${ID}.log
-touch $LOG
-echo -e "++++++++++++++++++++++++++++++ List of main commands and logs ++++++++++++++++++++++++++++++++++\nUSER: $USER\nSample: $ID\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n" > $LOG
 
 
 ########################################################################################### MAIN #################################################################################"
