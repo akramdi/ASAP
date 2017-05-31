@@ -8,12 +8,6 @@ Introduction
 
 ASAP is a flexible bioinformatic pipeline for ATAC-seq data analysis. Starting from raw ATAC-seq sequencing reads, ASAP outputs raw and filtered mapping files, coverage files (reads coverage ; tn5 insertion events coverage), fragment length distribution and peak calling results. 
 
-
-**User-friendly**: requires a single configuration file. Thus, only one option is required when running the command line (see `Usage of ASAP`_)
-
-**Flexible**: provides the possibility to skip a given step(s) and target specific post-processing step(s).
->>>>>>> 9315894f6f67959b9d2971b55ce909414906836d
-
 Overview of major steps 
 ==========================
 
@@ -32,6 +26,9 @@ Overview of major steps
 
 ASAP is:
 
+ **User-friendly**: requires a single configuration file. Thus, only one option is required when running the command line (see `Usage of ASAP`_)
+
+ **Flexible**: provides the possibility to skip a given step(s) and target specific post-processing step(s).
 
 
 Dependencies
@@ -98,7 +95,7 @@ Mapping step parameters
 :FASTQ1:                      fastq file (R1). File can be gizpped
 :FASTQ2:                      fastq file (R2). File can be gizpped
 :bowtieIndex:                 Prefix of bowtie2 indexes
-:mappingParameters:           Bowtie2  mapping parameters. Default: *--very-sensitive -X 2000 -p 10*
+:mappingParameters: Bowtie2  mapping parameters. Default: *--very-sensitive -X 2000 -p 10*
 
  
 Post mapping steps 
@@ -149,34 +146,21 @@ ASAP outputs mapping files and stats, coverage files, fragment length distributi
 Mapping output
 ---------------
 
-{sampleName}.mapped.sorted.bam:
-`````````````````````````````````
-Contains mapped reads (bowtie2 raw mapping results)
+:{sampleName}.mapped.sorted.bam:                Contains mapped reads (bowtie2 raw mapping results)
 
 Filtering/post-processing outputs
 ---------------------------------
 
-{sampleName}.*mis.mkdup.f3F1024.masked.shifted.bam:
-````````````````````````````````````````````````````
-Contains the selected set of reads after filtering. Ideally, accessible peaks are called using this file. 
+:{sampleName}.*mis.mkdup.f3F1024.masked.shifted.bam: Contains the selected set of reads after filtering. Ideally, accessible peaks are called using this file. 
 
-{sampleName}.filter.stats.csv: 
-````````````````````````````````
-Summary of filtering step is CSV format
+:{sampleName}.filter.stats.csv: Summary of filtering step is CSV format
 
 Coverage outputs
 ----------------
-{sampleName}.*mis.mkdup.f3F1024.masked.shifted.tdf:     
-````````````````````````````````````````````````````
-Genome-wide coverage of ATAC reads 
+:{sampleName}.*mis.mkdup.f3F1024.masked.shifted.tdf: Genome-wide coverage of ATAC reads 
+:{sampleName}.*mis.mkdup.f3F1024.masked.shifted.ievent.tdf: Genome-wide coverage of Tn5 insertion events
 
-{sampleName}.*mis.mkdup.f3F1024.masked.shifted.ievent.tdf:   
-``````````````````````````````````````````````````````````
-Genome-wide coverage of Tn5 insertion events
-
-{sampleName}.*mis.mkdup.f3F1024.masked.shifted.ievent.bam: 
-```````````````````````````````````````````````````````````
-Contains Tn5 insertion events. Basically, instead ofshowing reads, only the position corresponding to Tn5 insertion event are shown)
+:{sampleName}.*mis.mkdup.f3F1024.masked.shifted.ievent.bam: Contains Tn5 insertion events. Basically, instead of showing reads, only the position corresponding to Tn5 insertion event are shown)
 
 
 Fragment length distribution
