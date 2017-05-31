@@ -25,8 +25,8 @@ Overview of major steps
 - Peak calling
 
 ASAP is:
-
  **User-friendly**: requires a single configuration file. Thus, only one option is required when running the command line (see `Usage of ASAP`_)
+ 
 
  **Flexible**: provides the possibility to skip a given step(s) and target specific post-processing step(s).
 
@@ -146,21 +146,21 @@ ASAP outputs mapping files and stats, coverage files, fragment length distributi
 Mapping output
 ---------------
 
-:{sampleName}.mapped.sorted.bam:                Contains mapped reads (bowtie2 raw mapping results)
+:*.mapped.sorted.bam:                Contains mapped reads (bowtie2 raw mapping results)
 
 Filtering/post-processing outputs
 ---------------------------------
 
-:{sampleName}.*mis.mkdup.f3F1024.masked.shifted.bam: Contains the selected set of reads after filtering. Ideally, accessible peaks are called using this file. 
+:*.masked.shifted.bam: Contains the selected set of reads after filtering. Ideally, accessible peaks are called using this file. 
 
-:{sampleName}.filter.stats.csv: Summary of filtering step is CSV format
+:*.filter.stats.csv: Summary of filtering step is CSV format
 
 Coverage outputs
 ----------------
-:{sampleName}.*mis.mkdup.f3F1024.masked.shifted.tdf: Genome-wide coverage of ATAC reads 
-:{sampleName}.*mis.mkdup.f3F1024.masked.shifted.ievent.tdf: Genome-wide coverage of Tn5 insertion events
+:*.masked.shifted.tdf: Genome-wide coverage of ATAC reads 
+:*.masked.shifted.ievent.tdf: Genome-wide coverage of Tn5 insertion events
 
-:{sampleName}.*mis.mkdup.f3F1024.masked.shifted.ievent.bam: Contains Tn5 insertion events. Basically, instead of showing reads, only the position corresponding to Tn5 insertion event are shown)
+:*.masked.shifted.ievent.bam: Contains Tn5 insertion events. Basically, instead of showing reads, only the position corresponding to Tn5 insertion event are shown)
 
 
 Fragment length distribution
