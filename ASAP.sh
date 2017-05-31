@@ -281,6 +281,7 @@ cd $OUTDIR
 
 
 if [[ $map == "yes" ]]; then
+if [ ! -s $pathBowtie2 ]; then >&2 echo `file $pathBowtie2`  ; exit 1 ; fi
 #===============================================================================
 # Mapping step
 #===============================================================================
@@ -317,6 +318,10 @@ fi
 
 
 if [[ "$filter" == "yes" ]]; then 
+if [ ! -s $pathSamtools ]; then >&2 echo `file $pathSamtools`  ; exit 1 ; fi
+if [ ! -s $pathToJava ]; then >&2 echo `file $pathToJava`  ; exit 1 ; fi
+if [ ! -s $pathToPicardJar ]; then >&2 echo `file $pathToPicardJar`  ; exit 1 ; fi
+
 if [[ "$map" == "yes" ]]; then BAM=${ID}.mapped.sorted.bam ;fi 
 #===============================================================================
 # Post-processing and filtering
@@ -448,6 +453,9 @@ fi
 
 
 if [[ $readCoverage == "yes" ]]; then 
+
+if [ ! -s $pathIgvTools ]; then >&2 echo `file $pathIgvTools`  ; exit 1 ; fi
+
 	if [[ "$map" == "yes" && "$filter"=="no" ]]; then BAM=${ID}.mapped.sorted.bam ; fi
 	if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.masked.shifted.bam ; fi
 #===============================================================================
@@ -477,6 +485,9 @@ fi
 
 
 if [[ $ieventsCoverage == "yes" ]]; then 
+
+if [ ! -s $pathIgvTools ]; then >&2 echo `file $pathIgvTools`  ; exit 1 ; fi
+
 if [[ "$map" == "yes" && "$filter" == "no" ]]; then BAM=${ID}.mapped.sorted.bam ; fi
 if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.masked.shifted.bam ; fi
 
@@ -583,7 +594,10 @@ fi
 
 
 
-if [[ $callpeak == "yes" ]]; then 
+if [[ $callpeak == "yes" ]]; then
+
+if [ ! -s $pathMACS2 ]; then >&2 echo `file $pathMACS2`  ; exit 1 ; fi
+
 #get correct BAM file (user-provided or created)
 if [[ "$map" == "yes" && "$filter" == "no" ]]; then BAM=${ID}.mapped.sorted.bam ; fi
 if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.masked.shifted.bam ; fi
