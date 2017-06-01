@@ -177,7 +177,7 @@ Fragment length distribution
 
 Read extraction
 ---------------
-:*.subReads.f3.frg*.bam: Contains the set of extracted reads based on the given rage of fragment length
+:*.subReads.f3.frag*.bam: Contains the set of extracted reads based on the given rage of fragment length
 
 
 Peak calling outputs 
