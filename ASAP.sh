@@ -17,7 +17,8 @@ III. Compute coverage
  III.1. Compute read coverage
  III.2. Compute insertion events coverage
 IV. Compute fragment length distribution
- V. Peak calling
+ V. Extract read pairs based on a given range of fragment length
+VI. Peak calling
 
 readme
 
@@ -50,7 +51,7 @@ while getopts "hvc:" OPTION
 do
      case $OPTION in
 		v)
-		echo "ASAP - version beta 0.9.1"; exit 0
+		echo "ASAP - version 0.1"; exit 0
 		;;
          h)
              usage
@@ -111,8 +112,11 @@ config=( # set default values in config array
 [pathBowtie2]=""
 [pathToJava]=""
 [pathToPicardJar]=""
-)
+[extractReads]=""
+[lowBoundary]=""
+[upBoundary]=""
 
+)
 
 while read line
 do
@@ -153,7 +157,9 @@ pathMACS2=${config[pathMACS2]}
 pathBowtie2=${config[pathBowtie2]}
 pathToJava=${config[pathToJava]}
 pathToPicardJar=${config[pathToPicardJar]}
-
+extractReads=${config[extractReads]}
+lowBoundary=${config[lowBoundary]}
+upBoundary=${config[upBoundary]}
 
 #===============================================================================
 # Create tmp dir and LOG file
@@ -175,7 +181,7 @@ touch $LOG
 #================================== Check some parameters and issue warnings/errors
 
 #check yes/no parameters
-if [[ ( "$map" != "yes" && "$map" != "no" ) || ( "$filter" != "yes" && "$filter" != "no" ) || ( "$readCoverage" != "yes" && "$readCoverage" != "no" )  || ( "$ieventsCoverage" != "yes" && "$ieventsCoverage" != "no" ) || ( "$fragDist" != "yes" && "$fragDist" != "no" ) || ( "$callpeak" != "yes" && "$callpeak" != "no" ) ]] ; then 
+if [[ ( "$map" != "yes" && "$map" != "no" ) || ( "$filter" != "yes" && "$filter" != "no" ) || ( "$readCoverage" != "yes" && "$readCoverage" != "no" )  || ( "$ieventsCoverage" != "yes" && "$ieventsCoverage" != "no" ) || ( "$fragDist" != "yes" && "$fragDist" != "no" ) || ( "$callpeak" != "yes" && "$callpeak" != "no" ) || ( "$extractReads" != "yes" && "$extractReads" != "no" ) ]] ; then 
 	>&2 echo -e "\n[ERROR]: Possible values to turn on a section: yes/no. Exit." ; exit 1 
 fi
 
@@ -245,9 +251,19 @@ cat >> $LOCALTMP/tmp.conf <<EOL
 # Compute read coverage: $readCoverage
 # Compute insertion events coverage: $ieventsCoverage
 # Compute fragment length distribution: $fragDist
-# Peak calling: $callpeak
+# Extract read pairs based on fragment length: $extractReads
 EOL
 
+if [[ "$extractReads" == "yes" ]]; then 
+cat >> $LOCALTMP/tmp.conf <<EOL
+- Lower fragment length boundary: $lowBoundary nt
+- Upper fragment length boundary: $upBoundary nt
+EOL
+fi
+
+cat >> $LOCALTMP/tmp.conf <<EOL
+# Peak calling: $callpeak
+EOL
 
 #Check if an control file was provided
 if [ -z $peakCallingControl ]; then
@@ -292,7 +308,7 @@ echo "$stamp: Mapping command: #$pathBowtie2 -x $bowtieIndex $mappingParameters 
 eval "$pathBowtie2 -x $bowtieIndex $mappingParameters -1 $FASTQ1 -2 $FASTQ2 1> ${ID}.mapped.sam "
 
 
-echo "$stamp: Convert mapping outpur to bam..." | tee -a $LOG
+echo "$stamp: Convert mapping output to bam format..." | tee -a $LOG
 echo "#$pathSamtools view -bhS ${ID}.mapped.sam -o ${ID}.mapped.bam" >> $LOG
 $pathSamtools view -bhS ${ID}.mapped.sam -o ${ID}.mapped.bam
  
@@ -384,9 +400,11 @@ if [ -s $ID.${maxMis}mis.mkdup.f3F1024.masked.shifted.bam ]; then rm -f $ID.tmp.
 
 echo "$stamp: Extract filtering stats in CSV file..."
 
-Rawstats=$LOCALTMP/samtools.stats.inBAM.$ID.txt ; touch $Rawstats ; echo "# RAW SAMTOOLS STATS" >> $LOG ; cat $Rawstats >> $LOG
+Rawstats=$LOCALTMP/samtools.stats.inBAM.$ID.txt ; touch $Rawstats 
 $pathSamtools flagstat $BAM | awk 'BEGIN{OFS="\t"}{print "#flagstat", $0}' > $Rawstats
 $pathSamtools idxstats $BAM | awk 'BEGIN{OFS="\t"}{print "#idx", $0}'  >> $Rawstats
+#write raw samtools stats in LOG 
+echo "# RAW SAMTOOLS STATS" >> $LOG ; cat $Rawstats >> $LOG
 
 totalFastqReads=`cat $Rawstats | grep "#flagstat"  | awk '{print $2}' | awk '{FS="+"} NR ==1 {print $1}'`
 echo "$stamp: Total reads in $ID fastq: $totalFastqReads" 
@@ -405,7 +423,7 @@ SLreads=`grep regions $IDnreads | cut -f2`
 echo "$stamp: Reads falling into selected regions: $SLreads "
 
 SLreadsMis=`grep nmis $IDnreads | cut -f2`
-echo "$stamp: Reads carrying selected by $maxMis (within selected regions): $SLreadsMis"
+echo "$stamp: Reads selected by $maxMis mismatch(es) (within selected regions): $SLreadsMis"
 
 
 #----------- TOTAL READS THAT MAPPED TO CHRC/M
@@ -450,7 +468,7 @@ EOF
 echo "$stamp: Wrote filtering stat in CSV format: $outcsv"
 fi
 
-
+#===============================================================================
 
 if [[ $readCoverage == "yes" ]]; then 
 
@@ -482,7 +500,7 @@ echo "$stamp: Wrote coverage file: $COVDIR/$TDF "
 
 fi
 
-
+#===============================================================================
 
 if [[ $ieventsCoverage == "yes" ]]; then 
 
@@ -531,10 +549,10 @@ echo "$stamp: Wrote coverage of insertion events: $COVDIR/$TDF "
 
 fi
 
-
+#===============================================================================
 
 if [[ "$fragDist" == "yes" ]]; then 
-
+if [ ! -s $pathSamtools ]; then >&2 echo `file $pathSamtools`  ; exit 1 ; fi
 #get correct BAM file (user-provided or created)
 if [[ "$map" == "yes" && "$filter" == "no" ]]; then BAM=${ID}.mapped.sorted.bam ; fi
 if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.masked.shifted.bam ; fi
@@ -549,8 +567,8 @@ if [ ! -d $OUTDIR/Fragment_distribution_${ID} ]; then mkdir $OUTDIR/Fragment_dis
 
 echo "$stamp: Extraction of fragment length... " | tee -a $LOG
 #meaning of flag 66 -> 64 (first in pair) + 2 (read mapped in proper pair. Because we still have reads with no 2nd mate (*/=) and fixmate puts a TLEN=0 in this case)
-echo "samtools view $BAM -f 66 |  awk -v tot=$LOCALTMP/tot.tmp ' function abs(v) {return v < 0 ? -v : v}  {s++; print abs($9)} END {print s > tot }' | sort - -T $LOCALTMP | uniq -c |sort -k2 -g > TLEN.$ID.f66.txt " >> $LOG
-samtools view $BAM -f 66 |  awk -v tot=$LOCALTMP/tot.tmp ' function abs(v) {return v < 0 ? -v : v}  {s++; print abs($9)} END {print s > tot }' | sort - -T $LOCALTMP | uniq -c |sort -k2 -g > TLEN.$ID.f66.txt 
+echo "$pathSamtools view $BAM -f 66 |  awk -v tot=$LOCALTMP/tot.tmp ' function abs(v) {return v < 0 ? -v : v}  {s++; print abs($9)} END {print s > tot }' | sort - -T $LOCALTMP | uniq -c |sort -k2 -g > TLEN.$ID.f66.txt " >> $LOG
+$pathSamtools view $BAM -f 66 |  awk -v tot=$LOCALTMP/tot.tmp ' function abs(v) {return v < 0 ? -v : v}  {s++; print abs($9)} END {print s > tot }' | sort - -T $LOCALTMP | uniq -c |sort -k2 -g > TLEN.$ID.f66.txt 
 
 #Convert counts to frequencies:
 tot=`awk '{print $1}' $LOCALTMP/tot.tmp`
@@ -570,7 +588,7 @@ set xlabel "Fragment length"
 set ylabel "Frequencies"
 set grid
  
-set xrange [0:600]
+#set xrange [0:600]
 set xtics 50
  
 set grid mxtics  # draw lines for each xtics and mytics
@@ -583,16 +601,47 @@ set grid         # enable the grid
 
 plot 'TLEN.$ID.f66.txt' using 1:3 with lines
 EOF
-
-
 #move outputs to directory
 mv  TLEN.$ID.f66.txt TLEN.$ID.f66.png $FRAGDIR
 echo "$stamp: Wrote $FRAGDIR/TLEN.$ID.f66.txt ; $FRAGDIR/TLEN.$ID.f66.png"
 fi
 
+#===============================================================================
 
 
 
+if [[ "$extractReads" == "yes" ]]; then 
+if [ ! -s $pathSamtools ]; then >&2 echo `file $pathSamtools`  ; exit 1 ; fi
+#get correct BAM file (user-provided or created)
+if [[ "$map" == "yes" && "$filter" == "no" ]]; then BAM=${ID}.mapped.sorted.bam ; fi
+if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.masked.shifted.bam ; fi
+
+#===============================================================================
+# Extract read pairs based on a range of fragment length 
+#===============================================================================
+echo -e "\n######################## Extract reads based on fragment length range (using BAM:$BAM)" | tee -a $LOG
+# Create output bam name:
+subSetSam=$LOCALTMP/$ID.subReads.f3.frag-${lowBoundary}-${upBoundary}.sam
+subSetBam=$ID.subReads.f3.frg-${lowBoundary}-${upBoundary}.bam
+header=$LOCALTMP/header.txt ; touch $header
+
+echo "$stamp: Extract properly paired reads (-f3) whose framgnent lengths fall in [ $lowBoundary , $upBoundary ]..." | tee -a $LOG
+echo "$pathSamtools view $BAM -H >  $LOCALTMP/header.txt" >> $LOG
+echo "$pathSamtools view -f 3 $BAM | awk -v up=$upBoundary -v low=$lowBoundary -v out=$subSetSam ' function abs(v) {return v < 0 ? -v : v} $9 ~ /^[-0-9]+$/ {
+if (abs($9) >= low && abs($9) <= up) {print $0 > out }}'" >> $LOG
+
+$pathSamtools view $BAM -H >  $header
+$pathSamtools view -f 3 $BAM | awk -v up=$upBoundary -v low=$lowBoundary -v out=$subSetSam ' function abs(v) {return v < 0 ? -v : v} $9 ~ /^[-0-9]+$/ {
+if (abs($9) >= low && abs($9) <= up) {print $0 > out }}'
+
+echo "$stamp: Sort and index extracted reads..."
+cat $header $subSetSam | $pathSamtools view -bh - | $pathSamtools sort - -O bam -o $subSetBam -T $LOCALTMP 
+
+N=`$pathSamtools view $subSetBam -c`
+echo "$stamp: Worte $N reads in $subSetBam"
+fi
+
+#===============================================================================
 
 if [[ $callpeak == "yes" ]]; then
 
