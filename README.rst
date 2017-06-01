@@ -1,12 +1,12 @@
 ===================================
-README for ASAP (v0.9.1)
+README for ASAP (v0.1)
 ===================================
-ASAP Beta version 0.9.1
+ASAP version 0.1
 
 Introduction 
 ============
 
-ASAP is a flexible bioinformatic pipeline for ATAC-seq data analysis. Starting from raw ATAC-seq sequencing reads, ASAP outputs raw and filtered mapping files, coverage files (reads coverage ; tn5 insertion events coverage), fragment length distribution and peak calling results. 
+ASAP is a flexible bioinformatic pipeline for ATAC-seq data analysis. Starting from raw ATAC-seq sequencing reads, ASAP outputs raw and filtered mapping files, coverage files (reads coverage ; tn5 insertion events coverage), fragment length distribution, read exraction based on fragment length, and peak calling results. 
 
 Overview of major steps 
 ==========================
@@ -22,6 +22,7 @@ Overview of major steps
 - Compute read coverage
 - Compute insertion events coverage
 - Fragment length distribution
+- Extract reads pairs based on a fragment length range
 - Peak calling
 
 ASAP is:
@@ -127,6 +128,12 @@ Fragment length
 :fragDist:                    Set to "*yes/no*" if fragment length distribution should be computed or not
 
 
+Read extraction
+---------------
+:extractReads:                Set to "*yes/no*" if read pairs should be extracted based on a given range of fragment length
+:lowBoundary:                 Lower boundery of the range: [lowBoundary,upBoundary]. Default=100
+:upBoundary:				  Upper boundery of the range: [lowBoundary,upBoundary]. Default=250          
+
 
 Peak calling
 ------------
@@ -167,6 +174,10 @@ Fragment length distribution
 ----------------------------
 :TLEN.{sampleName}.f66.txt: Counts/frequencies of fragments length
 :TLEN.{sampleName}.f66.txt: Plot of fragment length distribution
+
+Read extraction
+---------------
+:*.subReads.f3.frg*.bam: Contains the set of extracted reads based on the given rage of fragment length
 
 
 Peak calling outputs 
