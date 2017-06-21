@@ -2,14 +2,14 @@
 
 
 :<<'readme'
-15/05/2017
+21/06/2017
 kramdi@biologie.ens.fr
 
 This script is written in an effort to gather the main analysis steps of ATAC-seq data.Here are the major steps:
 
 I.Mapping
 II.Post-mapping processing (mark duplicate pairs) and filtering
- II.1. Select reads that fall into predefined selected regions
+ II.1. Filter (or not) reads that fall into user-defined blacklisted regions
  II.2. Select reads that do not carry more than minMismatch
  II.3. Select concordant, non-duplicated pairs. 
  II.4. Shift read pairs as described in Buenorestro et al.,2013
@@ -74,8 +74,11 @@ if [  $# -eq 0 ]; then usage ; exit 1 ; fi
 #===============================================================================
 # Create timestamp for log
 #===============================================================================
+stamp() {
 date=`date "+[%b-%d-%Y %T]"`
-stamp="@$date"
+echo "@$date"
+}
+
 
 
 #===============================================================================
@@ -105,6 +108,8 @@ config=( # set default values in config array
 [control]=""
 [CHRLEN]=""
 [GENOME]=""
+[blacklist]=""
+[blacklistedRegions]=""
 [pathSamtools]=""
 [pathIgvTools]=""
 [pathGenomeCoverageBed]=""
@@ -136,7 +141,8 @@ FASTQ2=${config[FASTQ2]}
 bowtieIndex=${config[bowtieIndex]}
 mappingParameters=${config[mappingParameters]}
 maxMis=${config[maxMis]}
-SELECTEDREGIONS=${config[selectedRegions]} #changed variable name
+blacklist=${config[blacklist]}
+blacklistedRegions=${config[blacklistedRegions]}
 gsize=${config[gsize]}
 fdr=${config[fdr]}
 MODE=${config[MODE]}
@@ -181,7 +187,7 @@ touch $LOG
 #================================== Check some parameters and issue warnings/errors
 
 #check yes/no parameters
-if [[ ( "$map" != "yes" && "$map" != "no" ) || ( "$filter" != "yes" && "$filter" != "no" ) || ( "$readCoverage" != "yes" && "$readCoverage" != "no" )  || ( "$ieventsCoverage" != "yes" && "$ieventsCoverage" != "no" ) || ( "$fragDist" != "yes" && "$fragDist" != "no" ) || ( "$callpeak" != "yes" && "$callpeak" != "no" ) || ( "$extractReads" != "yes" && "$extractReads" != "no" ) ]] ; then 
+if [[ ( "$map" != "yes" && "$map" != "no" ) || ( "$filter" != "yes" && "$filter" != "no" ) || ( "$readCoverage" != "yes" && "$readCoverage" != "no" )  || ( "$ieventsCoverage" != "yes" && "$ieventsCoverage" != "no" ) || ( "$fragDist" != "yes" && "$fragDist" != "no" ) || ( "$callpeak" != "yes" && "$callpeak" != "no" ) || ( "$extractReads" != "yes" && "$extractReads" != "no" ) || ( "$blacklist" != "yes" && "$blacklist" != "no" ) ]] ; then 
 	>&2 echo -e "\n[ERROR]: Possible values to turn on a section: yes/no. Exit." ; exit 1 
 fi
 
@@ -238,10 +244,16 @@ cat >> $LOCALTMP/tmp.conf <<EOL
 EOL
 if [[ "$filter" == "yes" ]]; then 
 cat >> $LOCALTMP/tmp.conf <<EOL
-- Select reads that fall oustide blacklisted regions
+- Use blacklisted regions to filter reads: $blacklist
+EOL
+if [[ "$blacklist" == "yes" ]]; then
+cat >> $LOCALTMP/tmp.conf <<EOL
+ - Blacklisted regions: $blacklistedRegions
+EOL
+fi
+cat >> $LOCALTMP/tmp.conf <<EOL
 - Maximum mismatches per read: $maxMis
 - Select concordant, non-duplicated pairs
-[ Final set of reads: concordant, non-duplicated read pairs that carry no more than $maxMis mismatch and falls outside of blacklisted regions ]
 EOL
 fi
 
@@ -303,23 +315,23 @@ if [ ! -s $pathBowtie2 ]; then >&2 echo `file $pathBowtie2`  ; exit 1 ; fi
 #===============================================================================
 echo -e "\n######################## Mappinng step" | tee -a $LOG
 
-echo "$stamp: Mapping..." | tee -a $LOG
-echo "$stamp: Mapping command: #$pathBowtie2 -x $bowtieIndex $mappingParameters -1 $FASTQ1 -2 $FASTQ2 1> ${ID}.mapped.sam" | tee -a $LOG
+echo "`stamp`: Mapping..." | tee -a $LOG
+echo "`stamp`: Mapping command: #$pathBowtie2 -x $bowtieIndex $mappingParameters -1 $FASTQ1 -2 $FASTQ2 1> ${ID}.mapped.sam" | tee -a $LOG
 eval "$pathBowtie2 -x $bowtieIndex $mappingParameters -1 $FASTQ1 -2 $FASTQ2 1> ${ID}.mapped.sam "
 
 
-echo "$stamp: Convert mapping output to bam format..." | tee -a $LOG
+echo "`stamp`: Convert mapping output to bam format..." | tee -a $LOG
 echo "#$pathSamtools view -bhS ${ID}.mapped.sam -o ${ID}.mapped.bam" >> $LOG
 $pathSamtools view -bhS ${ID}.mapped.sam -o ${ID}.mapped.bam
  
 
-echo "$stamp: Sort bam..." | tee -a $LOG
+echo "`stamp`: Sort bam..." | tee -a $LOG
 echo "#$pathSamtools sort ${ID}.mapped.bam -o ${ID}.sorted.bam -O bam -T $LOCALTMP" >> $LOG
 $pathSamtools sort  ${ID}.mapped.bam -o ${ID}.mapped.sorted.bam -O bam -T $LOCALTMP
 
 if [ -s ${ID}.mapped.sorted.bam ]; then rm -f ${ID}.mapped.sam ${ID}.mapped.bam ; fi 
 
-echo "$stamp: Index sorted bam..." | tee -a $LOG
+echo "`stamp`: Index sorted bam..." | tee -a $LOG
 echo "#$pathSamtools index ${ID}.mapped.sorted.bam" >> $LOG
 $pathSamtools index ${ID}.mapped.sorted.bam
 
@@ -327,7 +339,7 @@ $pathSamtools index ${ID}.mapped.sorted.bam
 else
 
 	echo "Input BAM: $BAM"
-	if [ ! -s $BAM.bai ]; then echo "$stamp: Index input BAM..." ; $pathSamtools index $BAM ; fi
+	if [ ! -s $BAM.bai ]; then echo "`stamp`: Index input BAM..." ; $pathSamtools index $BAM ; fi
 fi
 
 
@@ -344,61 +356,70 @@ if [[ "$map" == "yes" ]]; then BAM=${ID}.mapped.sorted.bam ;fi
 #===============================================================================
 echo -e "\n######################## Post-processing and filtering step (using BAM:$BAM)" | tee -a $LOG
 
-#this file will hold the number of reads before and after the mismatch filter for informative purpose.(from the start,we only consider the reads that fell outside the blacklisted regions)
+#this file will hold the number of reads before and after the mismatch filter for informative purposes
 IDnreads=$LOCALTMP/$ID.nreads.txt
 
-#echo "** Moved to $FINALBAMDIR" >> $LOG
+# Remove reads based on blacklisted regions (if provided) + filter by max N mismatches
+if [[ "$blacklist" == "yes" ]]; then
+##create complement of the blacklisted regions for easy selection using samtools -L
+bedtools complement -i <(sort -k1,1 -k2,2n $blacklistedRegions) -g $CHRLEN | sort -k1,1 -k2,2n >  $LOCALTMP/selected_ATACseq_regions.bed
 
-#Select reads that fall into our selected regions + N mis + markduplicates + get concordant-non-duplicates 
-echo "$stamp: Filter by blacklisted regions and allowed mismatches..." | tee -a $LOG
-$pathSamtools view -h -F 4 $BAM -L $SELECTEDREGIONS | awk -v n=$maxMis -v ID=$ID -v IDnreads=$IDnreads  '{ a++ ; if($0 ~ /^@/) {print $0} else { mis=match($0,"XM:i:") ; nmis=substr($0,mis+5,2) ;if (int(nmis)<=n) {print $0; b++} } }END{printf("selected-regions\t%d\nreads-selected-by-nmis\t%d\n",a,b) > IDnreads }'  | $pathSamtools sort - -o $ID.${maxMis}mis.masked.sorted.bam -O bam -T $LOCALTMP
+#Select reads that fall into our selected regions + filter by N mis
+mask="masked"
+echo "`stamp`: Filter by blacklisted regions and allowed mismatches..." | tee -a $LOG
+$pathSamtools view -h -F 4 $BAM -L $LOCALTMP/selected_ATACseq_regions.bed | awk -v n=$maxMis -v ID=$ID -v IDnreads=$IDnreads  '{if($0 ~ /^@/) {print $0} else { a++ ; mis=match($0,"XM:i:") ; nmis=substr($0,mis+5,2) ;if (int(nmis)<=n) {print $0; b++} } }END{printf("selected-regions\t%d\nreads-selected-by-nmis\t%d\n",a,b) > IDnreads }'  | $pathSamtools sort - -o $ID.${maxMis}mis.$mask.sorted.bam -O bam -T $LOCALTMP
+else
+#if no blacklist is provided, do: filter by N mis
+mask="unmasked"
+echo "`stamp`: Filter by allowed mismatches..." | tee -a $LOG
+$pathSamtools view -h -F 4 $BAM | awk -v n=$maxMis -v ID=$ID -v IDnreads=$IDnreads  '{if($0 ~ /^@/) {print $0} else {a++ ;  mis=match($0,"XM:i:") ; nmis=substr($0,mis+5,2) ;if (int(nmis)<=n) {print $0; b++} } }END{printf("selected-regions\t%d\nreads-selected-by-nmis\t%d\n",a,b) > IDnreads }'  | $pathSamtools sort - -o $ID.${maxMis}mis.$mask.sorted.bam -O bam -T $LOCALTMP
+fi
 
 
-
-echo "$stamp: Mark duplicates..." | tee -a $LOG
+echo "`stamp`: Mark duplicates..." | tee -a $LOG
 echo "#$pathToJava -Xmx5g -Djava.io.tmpdir=$LOCALTMP \
 -jar $pathToPicardJar MarkDuplicates \
-METRICS_FILE=$LOGDIR/MKDUP.$ID.${maxMis}mis.masked.log  \
-INPUT=$ID.${maxMis}mis.masked.sorted.bam \
-OUTPUT=$ID.${maxMis}mis.mkdup.masked.bam 2> $log/MKDUP.$ID.${maxMis}mis.masked.err" >> $LOG
+METRICS_FILE=$LOGDIR/MKDUP.$ID.${maxMis}mis.$mask.log  \
+INPUT=$ID.${maxMis}mis.$mask.sorted.bam \
+OUTPUT=$ID.${maxMis}mis.mkdup.$mask.bam 2> $log/MKDUP.$ID.${maxMis}mis.$mask.err" >> $LOG
 
 
 $pathToJava -Xmx5g -Djava.io.tmpdir=$LOCALTMP \
 -jar $pathToPicardJar MarkDuplicates \
-METRICS_FILE=$LOGDIR/MKDUP.$ID.${maxMis}mis.masked.log  \
-INPUT=$ID.${maxMis}mis.masked.sorted.bam \
-OUTPUT=$ID.${maxMis}mis.mkdup.masked.bam 2> $LOGDIR/MKDUP.$ID.${maxMis}mis.masked.err
+METRICS_FILE=$LOGDIR/MKDUP.$ID.${maxMis}mis.$mask.log  \
+INPUT=$ID.${maxMis}mis.$mask.sorted.bam \
+OUTPUT=$ID.${maxMis}mis.mkdup.$mask.bam 2> $LOGDIR/MKDUP.$ID.${maxMis}mis.$mask.err
 
 
 #Get number of duplicates (from the reads falling into our selected regions and carrying no more than nmis) 
-echo "$stamp: Get stats on duplicates..." 
-nDup=`$pathSamtools view -f 1024 $ID.${maxMis}mis.mkdup.masked.bam -c`
+echo "`stamp`: Get stats on duplicates..." 
+nDup=`$pathSamtools view -f 1024 $ID.${maxMis}mis.mkdup.$mask.bam -c`
 
-echo "$stamp: Select concordant, non-duplicated reads..."   | tee -a $LOG
-echo "#$pathSamtools view -hb -f 3 -F 1024 $ID.${maxMis}mis.mkdup.masked.bam >  $ID.${maxMis}mis.mkdup.f3F1024.masked.bam  " >> $LOG
+echo "`stamp`: Select concordant, non-duplicated reads..."   | tee -a $LOG
+echo "#$pathSamtools view -hb -f 3 -F 1024 $ID.${maxMis}mis.mkdup.$mask.bam >  $ID.${maxMis}mis.mkdup.f3F1024.$mask.bam  " >> $LOG
  
-$pathSamtools view -hb -f 3 -F 1024 $ID.${maxMis}mis.mkdup.masked.bam >  $ID.${maxMis}mis.mkdup.f3F1024.masked.bam 
+$pathSamtools view -hb -f 3 -F 1024 $ID.${maxMis}mis.mkdup.$mask.bam >  $ID.${maxMis}mis.mkdup.f3F1024.$mask.bam 
 
 #remove intermediate files
-if [ -s  $ID.${maxMis}mis.mkdup.f3F1024.masked.bam ] ; then rm -f $ID.${maxMis}mis.mkdup.masked.bam $ID.${maxMis}mis.masked.sorted.bam ; fi
+if [ -s  $ID.${maxMis}mis.mkdup.f3F1024.$mask.bam ] ; then rm -f $ID.${maxMis}mis.mkdup.$mask.bam $ID.${maxMis}mis.$mask.sorted.bam ; fi
 
 #========4. Fix mates!
-echo "$stamp: Shift reads..." 
-$pathSamtools sort -n $ID.${maxMis}mis.mkdup.f3F1024.masked.bam -T $LOCALTMP -O bam | $pathSamtools fixmate - $ID.tmp.bam
+echo "`stamp`: Shift reads..." 
+$pathSamtools sort -n $ID.${maxMis}mis.mkdup.f3F1024.$mask.bam -T $LOCALTMP -O bam | $pathSamtools fixmate - $ID.tmp.bam
 
 #========5. Shift reads! and sort by coordinates for indexing 
 $pathSamtools view -h -F 16 $ID.tmp.bam |  awk 'BEGIN{OFS="\t"} { if ($1 ~ /^@/) {print} else { Rlen=length($10) ; $4=$4+4 ; $8=$8-5 ; if ($8<0 && $8==0) {$8=1} ;  print $0   }}' > $ID.tmp.shifted.sam
 $pathSamtools view -f 16 $ID.tmp.bam | awk 'BEGIN{OFS="\t"} { $4=$4-5 ;if ($4<0 && $4==0) {$4=1} ;  $8=$8+4 ;  print $0 }' >> $ID.tmp.shifted.sam
-$pathSamtools view -bh $ID.tmp.shifted.sam | $pathSamtools sort - -o $ID.${maxMis}mis.mkdup.f3F1024.masked.shifted.bam -O bam -T $LOCALTMP
+$pathSamtools view -bh $ID.tmp.shifted.sam | $pathSamtools sort - -o $ID.${maxMis}mis.mkdup.f3F1024.$mask.shifted.bam -O bam -T $LOCALTMP
 
 # index file
-echo "$stamp: Index output bam file..."
-$pathSamtools index $ID.${maxMis}mis.mkdup.f3F1024.masked.shifted.bam
+echo "`stamp`: Index output bam file..."
+$pathSamtools index $ID.${maxMis}mis.mkdup.f3F1024.$mask.shifted.bam
 
 #remove tmp bam file
-if [ -s $ID.${maxMis}mis.mkdup.f3F1024.masked.shifted.bam ]; then rm -f $ID.tmp.bam $ID.tmp.shifted.sam  $ID.${maxMis}mis.mkdup.f3F1024.masked.bam ; fi 
+if [ -s $ID.${maxMis}mis.mkdup.f3F1024.$mask.shifted.bam ]; then rm -f $ID.tmp.bam $ID.tmp.shifted.sam  $ID.${maxMis}mis.mkdup.f3F1024.$mask.bam ; fi 
 
-echo "$stamp: Extract filtering stats in CSV file..."
+echo "`stamp`: Extract filtering stats in CSV file..."
 
 Rawstats=$LOCALTMP/samtools.stats.inBAM.$ID.txt ; touch $Rawstats 
 $pathSamtools flagstat $BAM | awk 'BEGIN{OFS="\t"}{print "#flagstat", $0}' > $Rawstats
@@ -407,23 +428,23 @@ $pathSamtools idxstats $BAM | awk 'BEGIN{OFS="\t"}{print "#idx", $0}'  >> $Rawst
 echo "# RAW SAMTOOLS STATS" >> $LOG ; cat $Rawstats >> $LOG
 
 totalFastqReads=`cat $Rawstats | grep "#flagstat"  | awk '{print $2}' | awk '{FS="+"} NR ==1 {print $1}'`
-echo "$stamp: Total reads in $ID fastq: $totalFastqReads" 
+echo "`stamp`: Total reads in $ID fastq: $totalFastqReads" 
 
 #total unmapped/mapped (no mismatche filtering)
 totalMa=`cat $Rawstats | grep "#flagstat" | awk '{print $2}' | awk '{FS="+"} NR ==5 {print $1}'`
 totalUnma=$((totalFastqReads-totalMa)) 
-echo "$stamp: Unmapped reads: $totalUnma"
-echo "$stamp: Mapped reads: $totalMa"
+echo "`stamp`: Unmapped reads: $totalUnma"
+echo "`stamp`: Mapped reads: $totalMa"
 
 
 #To get the number of reads falling into blacklisted regions, we subtract the number of reads that DID not fall into the black listed regions - total number of reads
 #BLreads=`echo "$totalFastqReads-`grep selected $IDnreads | cut -f2`" | bc`
 
 SLreads=`grep regions $IDnreads | cut -f2`
-echo "$stamp: Reads falling into selected regions: $SLreads "
+echo "`stamp`: Reads falling into selected regions: $SLreads "
 
 SLreadsMis=`grep nmis $IDnreads | cut -f2`
-echo "$stamp: Reads selected by $maxMis mismatch(es) (within selected regions): $SLreadsMis"
+echo "`stamp`: Reads selected by $maxMis mismatch(es) (among selected reads by blacklisted regions): $SLreadsMis"
 
 
 #----------- TOTAL READS THAT MAPPED TO CHRC/M
@@ -432,18 +453,18 @@ echo "$stamp: Reads selected by $maxMis mismatch(es) (within selected regions): 
 nMaChrM=`grep "#id" $Rawstats | awk '{print $2,$3,$4,$5}' | awk '$1=="ChrM" {print $3}'`
 nMaChrC=`grep "#id" $Rawstats | awk '{print $2,$3,$4,$5}' | awk '$1=="ChrC" {print $3}'`
 nMaChrMC=$((nMaChrM+nMaChrC))
-echo "$stamp: Mapped reads on ChrM+ChrC: $nMaChrMC (ChrM: $nMaChrM ChrC: $nMaChrC )"
+echo "`stamp`: Mapped reads on ChrM+ChrC: $nMaChrMC (ChrM: $nMaChrM ChrC: $nMaChrC )"
 
 #----------- TOTAL READS THAT MAPPED TO CHR1-5
 #--- mapped on  Chr1-5
 nMaChr15=`grep "#id" $Rawstats | awk '{print $2,$3,$4,$5}' |awk '$1!="ChrC" && $1!="ChrM" {s+=$3}END{print s}'`
-echo "$stamp: Mapped reads on Chr1-->Chr5: $nMaChr15"
+echo "`stamp`: Mapped reads on Chr1-->Chr5: $nMaChr15"
 
 
 #----------- TOTAL READS SELECTED READS
 
-FinalReads=`$pathSamtools view $ID.${maxMis}mis.mkdup.f3F1024.masked.shifted.bam -c`
-echo "$stamp: Final number of selected reads: $FinalReads"
+FinalReads=`$pathSamtools view $ID.${maxMis}mis.mkdup.f3F1024.$mask.shifted.bam -c`
+echo "`stamp`: Final number of selected reads: $FinalReads"
 
 #----------------------------------------------- print all
 title="SAMPLE,Total_reads_fastq,Total_mapped_reads,Mapped_on_ChM,Mapped_on_ChC,Mapped_on_ChM-ChrC,Mapped_on_Chr1-5,Total_mapped_selected_reads,Total_mapped_selected_reads_${maxMis}mis,Total_mapped_selected_reads_${maxMis}mis_dup,Final_reads"
@@ -457,15 +478,15 @@ cat > $outcsv <<EOF
 #Mapped_on_ChC:number of reads that mapped to ChrC
 #Mapped_on_ChM-ChrC: sum of number of reads that mapped to ChrM and ChC
 #Mapped_on_Chr1-5: number of reads that mapped to nuclear DNA (Chr1->Chr5)
-#Total_mapped_selected_reads: total mapped reads that fall outside of pre-defined blackisted regions (blackilisted regions include ChrM-ChrC)
-#Total_mapped_selected_reads_${maxMis}mis: total mapped reads that fall outside of pre-defined blackisted regions and carry no more than $maxMis mismatches
-#Total_mapped_selected_reads_${maxMis}mis_dup: total mapped duplicate reads that fall outside of pre-defined blackisted regions and carry no more than $maxMis mismatches
-#Final_reads: Number of reads selected after filtering steps based on (i) blacklisted regions (ii) mismatches (iii) non-duplicated concordant pairs
+#Total_mapped_selected_reads: Number of selected reads after blacklist filtering. (Equals the initial number of reads if no blacklist was provided)
+#Total_mapped_selected_reads_${maxMis}mis: Number of selected reads based on maximum $maxMis mismatches
+#Total_mapped_selected_reads_${maxMis}mis_dup: Number of duplicates (reads are counted after the two previous filtering steps
+#Final_reads: Number of reads selected after filtering steps based on (i) blacklisted regions, if set (ii) mismatches (iii) non-duplicated concordant pairs
 ,,
 $title
 $ID,$totalFastqReads,$totalMa,$nMaChrM,$nMaChrC,$nMaChrMC,$nMaChr15,$SLreads,$SLreadsMis,$nDup,$FinalReads
 EOF
-echo "$stamp: Wrote filtering stat in CSV format: $outcsv"
+echo "`stamp`: Wrote filtering stat in CSV format: $outcsv"
 fi
 
 #===============================================================================
@@ -475,7 +496,7 @@ if [[ $readCoverage == "yes" ]]; then
 if [ ! -s $pathIgvTools ]; then >&2 echo `file $pathIgvTools`  ; exit 1 ; fi
 
 	if [[ "$map" == "yes" && "$filter"=="no" ]]; then BAM=${ID}.mapped.sorted.bam ; fi
-	if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.masked.shifted.bam ; fi
+	if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.$mask.shifted.bam ; fi
 #===============================================================================
 # Compute read coverage 
 #===============================================================================
@@ -486,9 +507,9 @@ BEDGRAPH=${BAM/.bam/.bedgraph}
 TDF=${BAM/.bam/.tdf}
 
 
-echo "$stamp: Get bedgraph..."
+echo "`stamp`: Get bedgraph..."
 $pathGenomeCoverageBed -ibam $BAM -g $CHRLEN -bga -trackline > $BEDGRAPH
-echo "$stamp: Convert bedgraph to tdf..."
+echo "`stamp`: Convert bedgraph to tdf..."
 $pathIgvTools toTDF $BEDGRAPH $TDF $GENOME 1>> $LOG 2>&1
 #remove bedgraph if tdf was correctly created: -s means file exists and has a non zero size
 if [ -s $TDF ]; then rm -f $BEDGRAPH ; fi 
@@ -496,7 +517,7 @@ rm -f igv.log
 
 #mv output to Coverage dir
 mv $TDF $COVDIR
-echo "$stamp: Wrote coverage file: $COVDIR/$TDF "
+echo "`stamp`: Wrote coverage file: $COVDIR/$TDF "
 
 fi
 
@@ -507,7 +528,7 @@ if [[ $ieventsCoverage == "yes" ]]; then
 if [ ! -s $pathIgvTools ]; then >&2 echo `file $pathIgvTools`  ; exit 1 ; fi
 
 if [[ "$map" == "yes" && "$filter" == "no" ]]; then BAM=${ID}.mapped.sorted.bam ; fi
-if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.masked.shifted.bam ; fi
+if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.$mask.shifted.bam ; fi
 
 #===============================================================================
 # Compute insertion event coverage
@@ -520,7 +541,7 @@ OUTBAM=${BAM/.bam/.ievent.bam}
 BEDGRAPH=${BAM/.bam/.ievent.bedgraph}
 TDF=${BAM/.bam/.ievent.tdf}
 
-echo "$stamp: Extract insertion events..." | tee -a $LOG
+echo "`stamp`: Extract insertion events..." | tee -a $LOG
 
 $pathSamtools view -h $BAM -F 16 |awk 'BEGIN{OFS="\t"}{ if ($1 ~ /^@/) {print ;} else {Rlen=length($10) ; $6=1"M"; $8=$8+Rlen-1 ; $10=substr($10,1,1);$11=substr($11,1,1); print $0 }}' > $ID.tmp.ievent.sam
 $pathSamtools view $BAM -f 16 | awk 'BEGIN{OFS="\t"}{Rlen=length($10) ; $6=1"M"; $4=$4+Rlen-1; $10=substr($10,Rlen,1) ; $11=substr($11,Rlen,1) ; print $0}' >> $ID.tmp.ievent.sam
@@ -530,22 +551,22 @@ $pathSamtools view $ID.tmp.ievent.sam -bh | $pathSamtools sort - -o $OUTBAM -O b
 $pathSamtools index $OUTBAM
 if [ -s $OUTBAM ]; then rm -f $ID.tmp.ievent.sam ; fi 
 
-echo "$stamp: Wrote insertion events in bam file: $OUTBAM "
+echo "`stamp`: Wrote insertion events in bam file: $OUTBAM "
 
 
 #then, get the coverage of insertion events
 #cd $IEDIR
-echo "$stamp: Compute ievents coverage..." | tee -a $LOG
-echo "$stamp: Get bedgraph..."
+echo "`stamp`: Compute ievents coverage..." | tee -a $LOG
+echo "`stamp`: Get bedgraph..."
 $pathGenomeCoverageBed -ibam $OUTBAM -g $CHRLEN -bga -trackline > $BEDGRAPH
-echo "$stamp: Convert bedgraph to tdf... "
+echo "`stamp`: Convert bedgraph to tdf... "
 $pathIgvTools toTDF $BEDGRAPH $TDF $GENOME 1>> $LOG 2>&1
 if [ -s $TDF ]; then rm -f $BEDGRAPH ; fi  
 rm -f igv.log
 
 #mv output to Coverage dir
 mv $TDF $COVDIR
-echo "$stamp: Wrote coverage of insertion events: $COVDIR/$TDF "
+echo "`stamp`: Wrote coverage of insertion events: $COVDIR/$TDF "
 
 fi
 
@@ -555,7 +576,7 @@ if [[ "$fragDist" == "yes" ]]; then
 if [ ! -s $pathSamtools ]; then >&2 echo `file $pathSamtools`  ; exit 1 ; fi
 #get correct BAM file (user-provided or created)
 if [[ "$map" == "yes" && "$filter" == "no" ]]; then BAM=${ID}.mapped.sorted.bam ; fi
-if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.masked.shifted.bam ; fi
+if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.$mask.shifted.bam ; fi
 
 #===============================================================================
 # Compute fragment length distribution
@@ -565,7 +586,7 @@ echo -e "\n######################## Compute fragment length distribution (using 
 #create dir for fragment length
 if [ ! -d $OUTDIR/Fragment_distribution_${ID} ]; then mkdir $OUTDIR/Fragment_distribution_${ID} ; fi 
 
-echo "$stamp: Extraction of fragment length... " | tee -a $LOG
+echo "`stamp`: Extraction of fragment length... " | tee -a $LOG
 #meaning of flag 66 -> 64 (first in pair) + 2 (read mapped in proper pair. Because we still have reads with no 2nd mate (*/=) and fixmate puts a TLEN=0 in this case)
 echo "$pathSamtools view $BAM -f 66 |  awk -v tot=$LOCALTMP/tot.tmp ' function abs(v) {return v < 0 ? -v : v}  {s++; print abs($9)} END {print s > tot }' | sort - -T $LOCALTMP | uniq -c |sort -k2 -g > TLEN.$ID.f66.txt " >> $LOG
 $pathSamtools view $BAM -f 66 |  awk -v tot=$LOCALTMP/tot.tmp ' function abs(v) {return v < 0 ? -v : v}  {s++; print abs($9)} END {print s > tot }' | sort - -T $LOCALTMP | uniq -c |sort -k2 -g > TLEN.$ID.f66.txt 
@@ -574,7 +595,7 @@ $pathSamtools view $BAM -f 66 |  awk -v tot=$LOCALTMP/tot.tmp ' function abs(v) 
 tot=`awk '{print $1}' $LOCALTMP/tot.tmp`
 awk -v tot=$tot 'BEGIN{OFS="\t"; print "#TLEN\tcount\tFreq"} {printf ("%d\t%d\t%f\n",$2,$1,$1/tot)}'  TLEN.$ID.f66.txt > tmp ; mv tmp TLEN.$ID.f66.txt
 
-echo "$stamp: Plot fragment length distribution... "
+echo "`stamp`: Plot fragment length distribution... "
 gnuplot << EOF
 set term pngcairo size 1024,768
 set output "TLEN.$ID.f66.png"
@@ -603,7 +624,7 @@ plot 'TLEN.$ID.f66.txt' using 1:3 with lines
 EOF
 #move outputs to directory
 mv  TLEN.$ID.f66.txt TLEN.$ID.f66.png $FRAGDIR
-echo "$stamp: Wrote $FRAGDIR/TLEN.$ID.f66.txt ; $FRAGDIR/TLEN.$ID.f66.png"
+echo "`stamp`: Wrote $FRAGDIR/TLEN.$ID.f66.txt ; $FRAGDIR/TLEN.$ID.f66.png"
 fi
 
 #===============================================================================
@@ -614,7 +635,7 @@ if [[ "$extractReads" == "yes" ]]; then
 if [ ! -s $pathSamtools ]; then >&2 echo `file $pathSamtools`  ; exit 1 ; fi
 #get correct BAM file (user-provided or created)
 if [[ "$map" == "yes" && "$filter" == "no" ]]; then BAM=${ID}.mapped.sorted.bam ; fi
-if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.masked.shifted.bam ; fi
+if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.$mask.shifted.bam ; fi
 
 #===============================================================================
 # Extract read pairs based on a range of fragment length 
@@ -625,7 +646,7 @@ subSetSam=$LOCALTMP/$ID.subReads.f3.frag-${lowBoundary}-${upBoundary}.sam
 subSetBam=$ID.subReads.f3.frg-${lowBoundary}-${upBoundary}.bam
 header=$LOCALTMP/header.txt ; touch $header
 
-echo "$stamp: Extract properly paired reads (-f3) whose framgnent lengths fall in [ $lowBoundary , $upBoundary ]..." | tee -a $LOG
+echo "`stamp`: Extract properly paired reads (-f3) whose framgnent lengths fall in [ $lowBoundary , $upBoundary ]..." | tee -a $LOG
 echo "$pathSamtools view $BAM -H >  $LOCALTMP/header.txt" >> $LOG
 echo "$pathSamtools view -f 3 $BAM | awk -v up=$upBoundary -v low=$lowBoundary -v out=$subSetSam ' function abs(v) {return v < 0 ? -v : v} $9 ~ /^[-0-9]+$/ {
 if (abs($9) >= low && abs($9) <= up) {print $0 > out }}'" >> $LOG
@@ -634,11 +655,11 @@ $pathSamtools view $BAM -H >  $header
 $pathSamtools view -f 3 $BAM | awk -v up=$upBoundary -v low=$lowBoundary -v out=$subSetSam ' function abs(v) {return v < 0 ? -v : v} $9 ~ /^[-0-9]+$/ {
 if (abs($9) >= low && abs($9) <= up) {print $0 > out }}'
 
-echo "$stamp: Sort and index extracted reads..."
+echo "`stamp`: Sort and index extracted reads..."
 cat $header $subSetSam | $pathSamtools view -bh - | $pathSamtools sort - -O bam -o $subSetBam -T $LOCALTMP 
 
 N=`$pathSamtools view $subSetBam -c`
-echo "$stamp: Worte $N reads in $subSetBam"
+echo "`stamp`: Worte $N reads in $subSetBam"
 fi
 
 #===============================================================================
@@ -649,7 +670,7 @@ if [ ! -s $pathMACS2 ]; then >&2 echo `file $pathMACS2`  ; exit 1 ; fi
 
 #get correct BAM file (user-provided or created)
 if [[ "$map" == "yes" && "$filter" == "no" ]]; then BAM=${ID}.mapped.sorted.bam ; fi
-if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.masked.shifted.bam ; fi
+if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.$mask.shifted.bam ; fi
 #===============================================================================
 # Peak calling
 #===============================================================================
