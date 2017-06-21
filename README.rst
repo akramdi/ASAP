@@ -14,7 +14,7 @@ Overview of major steps
 - Mapping 
 - Post-mapping processing and filtering:
 
-  - Remove reads that fall into blacklisted regions
+  - Filter (or not) reads that fall into user-defined blacklisted regions
   - Select reads that do not carry more than minMismatch
   - Mark duplicated pairs
   - Select concordant, non-duplicated pairs. 
@@ -86,6 +86,7 @@ General information option about the run. Must be always filled.
 
 :OUTDIR:              Main output directory where results are written. OUTDIR is created if does not exist
 :sampleName:          Name of the processed sample. No space is allowed: use _ or - to mimic space if needed
+:CHRLEN:              Chromosome info file (tab-delimited format: *<Chr name><chr length>*)
 :path:                Full path to the different dependencies, if not already added to $PATH
 
 
@@ -112,16 +113,14 @@ Filtering parameters
 :filter:                     Set to "*yes/no*". If *map=yes*, filtering will be performed on internal mapping results, 
                              if *map=no*, filtering will be performed on the provided alignment file in BAM option. 
 :maxMis:                      Maximum number of mismatches allowed per read.
-:selectedRegions:             Regions used to select reads. (tab-delimited format: *<Chr name><start><end>*)
+:blacklistedRegions:          regions used to filter reads.(tab-delimited format: <Chr name><start><end>)
 
 
 Coverage
 ---------
 :readCoverage:                Set to "*yes/no*" if read coverage should be computed or not
 :ieventsCoverage:             Set to "*yes/no*" if Tn5 insertion event coverage should be computed or not
-:GENOME:                      Genome assembly (tair10)
-:CHRLEN:                      Chromosome info file (tab-delimited format: *<Chr name><chr length>*)
-
+:GENOME:                      Genome assembly. Use same genomes names as igvtools (tair10, hg38, mm9..)
 
 Fragment length
 ---------------
