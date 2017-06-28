@@ -610,12 +610,13 @@ set ylabel "Frequencies"
 set grid
  
 #set xrange [0:600]
-set xtics 50
+set xtics 100
  
 set grid mxtics  # draw lines for each xtics and mytics
 set mxtics 10    # set the spacing for the mytics
 set grid         # enable the grid
 
+set xtics rotate by 315 offset -1,0
 
 #set arrow from 2,graph(0,0) to 2,graph(1,1) nohead
 #plot 'TLEN.$ID.f66.txt' title "" with points pt 7 ps 0.1
