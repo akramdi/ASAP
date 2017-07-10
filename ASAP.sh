@@ -647,7 +647,7 @@ subSetSam=$LOCALTMP/$ID.subReads.f3.frag-${lowBoundary}-${upBoundary}.sam
 subSetBam=$ID.subReads.f3.frg-${lowBoundary}-${upBoundary}.bam
 header=$LOCALTMP/header.txt ; touch $header
 
-echo "`stamp`: Extract properly paired reads (-f3) whose framgnent lengths fall in [ $lowBoundary , $upBoundary ]..." | tee -a $LOG
+echo "`stamp`: Extract properly paired reads (-f3) with fragment lengths [ $lowBoundary , $upBoundary ]..." | tee -a $LOG
 echo "$pathSamtools view $BAM -H >  $LOCALTMP/header.txt" >> $LOG
 echo "$pathSamtools view -f 3 $BAM | awk -v up=$upBoundary -v low=$lowBoundary -v out=$subSetSam ' function abs(v) {return v < 0 ? -v : v} $9 ~ /^[-0-9]+$/ {
 if (abs($9) >= low && abs($9) <= up) {print $0 > out }}'" >> $LOG
