@@ -115,7 +115,7 @@ Filtering parameters
                              
 :maxMis:                     Maximum number of mismatches allowed per read.
 :blacklist:                  Set to "yes/no" if reads should be filtred based on a list of blacklisted regions. 
-                             If "*blacklist=yes*", blacklisted regions are must be provided in the next parameter. 
+                             If "*blacklist=yes*", blacklisted regions must be provided in the next parameter. 
 
 :blacklistedRegions:         Regions used to filter reads.(tab-delimited format: <Chr name><start><end>)
 
@@ -124,7 +124,7 @@ Filtering parameters
 Coverage
 ---------
 :readCoverage:                Set to "*yes/no*" if read coverage should be computed or not
-:ieventsCoverage:             Set to "*yes/no*" if Tn5 insertion event coverage should be computed or not
+:ieventsCoverage:             Set to "*yes/no*" if Tn5 insertion events coverage should be computed or not
 :GENOME:                      Genome assembly. Use same genomes names as igvtools (tair10, hg38, mm9..)
 
 Fragment length
@@ -152,8 +152,7 @@ Peak calling
 Output files
 ============
 
-ASAP outputs mapping files and stats, coverage files, fragment length distribution and MACS2 peak calling results.
-
+ASAP outputs mapping files, coverage files, fragments distribution table/plot and MACS2 peak calling results.
 Mapping output
 ---------------
 
