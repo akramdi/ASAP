@@ -112,8 +112,13 @@ Filtering parameters
 
 :filter:                     Set to "*yes/no*". If *map=yes*, filtering will be performed on internal mapping results, 
                              if *map=no*, filtering will be performed on the provided alignment file in BAM option. 
-:maxMis:                      Maximum number of mismatches allowed per read.
-:blacklistedRegions:          regions used to filter reads.(tab-delimited format: <Chr name><start><end>)
+                             
+:maxMis:                     Maximum number of mismatches allowed per read.
+:blacklist:                  Set to "yes/no" if reads should be filtred based on a list of blacklisted regions. 
+                             If "*blacklist=yes*", blacklisted regions are must be provided in the next parameter. 
+
+:blacklistedRegions:         Regions used to filter reads.(tab-delimited format: <Chr name><start><end>)
+
 
 
 Coverage
