@@ -4,6 +4,7 @@
 :<<'readme'
 21/06/2017
 kramdi@biologie.ens.fr
+kramdi.a@gmail.com
 
 This script is written in an effort to gather the main analysis steps of ATAC-seq data.Here are the major steps:
 
@@ -12,7 +13,7 @@ II.Post-mapping processing (mark duplicate pairs) and filtering
  II.1. Filter (or not) reads that fall into user-defined blacklisted regions
  II.2. Select reads that do not carry more than minMismatch
  II.3. Select concordant, non-duplicated pairs. 
- II.4. Shift read pairs as described in Buenorestro et al.,2013
+ II.4. Shift read by 4bp as described in Schep et al.,2015
 III. Compute coverage
  III.1. Compute read coverage
  III.2. Compute insertion events coverage
@@ -89,6 +90,7 @@ echo "@$date"
 typeset -A config # init array
 config=( # set default values in config array
 [OUTDIR]=""
+[LOCALTMP]=""
 [sampleName]=""
 [FASTQ1]=""
 [FASTQ2]=""
@@ -110,6 +112,7 @@ config=( # set default values in config array
 [GENOME]=""
 [blacklist]=""
 [blacklistedRegions]=""
+[shift]=""
 [pathSamtools]=""
 [pathIgvTools]=""
 [pathGenomeCoverageBed]=""
@@ -135,6 +138,7 @@ done < $CONFIG
 
 #Create variables
 OUTDIR=${config[OUTDIR]}
+LOCALTMP=${config[TMPDIR]} #changed variable name
 ID=${config[sampleName]} #changed variable name
 FASTQ1=${config[FASTQ1]}
 FASTQ2=${config[FASTQ2]}
@@ -143,6 +147,7 @@ mappingParameters=${config[mappingParameters]}
 maxMis=${config[maxMis]}
 blacklist=${config[blacklist]}
 blacklistedRegions=${config[blacklistedRegions]}
+shift=${config[shift]}
 gsize=${config[gsize]}
 fdr=${config[fdr]}
 MODE=${config[MODE]}
@@ -171,7 +176,12 @@ upBoundary=${config[upBoundary]}
 # Create tmp dir and LOG file
 #===============================================================================
 
-LOCALTMP=$OUTDIR/tmp$RANDOM
+#remove possible tailing "/"
+LOCALTMP=${LOCALTMP%\/}
+if [ ! -d $LOCALTMP ]; then >&2 echo -e "\n[ERROR]: TMPDIR must be a directory. Exit." ; exit 1 ;fi
+
+#create tmp dir
+LOCALTMP=$LOCALTMP/tmp$RANDOM
 if [ ! -d $LOCALTMP ]; then mkdir $LOCALTMP ; fi 
 
 function finish {
@@ -180,6 +190,7 @@ rm -rf $LOCALTMP
 trap finish EXIT 
 
 #Create log file where all commands are kept. Comes in handy in case of debugging
+if [ -d $OUTDIR ]; then >&2 echo "[WARNING]: Output directory ($OUTDIR) already exists. Results will be overwitten." ; else mkdir $OUTDIR; fi 
 LOGDIR=$OUTDIR/logs_${ID} ; if [ ! -d $LOGDIR ] ; then mkdir $LOGDIR ;fi 
 LOG=$LOGDIR/commands_ASAP_run_${ID}.log
 touch $LOG
@@ -187,11 +198,11 @@ touch $LOG
 #================================== Check some parameters and issue warnings/errors
 
 #check yes/no parameters
-if [[ ( "$map" != "yes" && "$map" != "no" ) || ( "$filter" != "yes" && "$filter" != "no" ) || ( "$readCoverage" != "yes" && "$readCoverage" != "no" )  || ( "$ieventsCoverage" != "yes" && "$ieventsCoverage" != "no" ) || ( "$fragDist" != "yes" && "$fragDist" != "no" ) || ( "$callpeak" != "yes" && "$callpeak" != "no" ) || ( "$extractReads" != "yes" && "$extractReads" != "no" ) || ( "$blacklist" != "yes" && "$blacklist" != "no" ) ]] ; then 
-	>&2 echo -e "\n[ERROR]: Possible values to turn on a section: yes/no. Exit." ; exit 1 
+if [[ ( "$map" != "yes" && "$map" != "no" ) || ( "$filter" != "yes" && "$filter" != "no" ) || ( "$readCoverage" != "yes" && "$readCoverage" != "no" )  || ( "$ieventsCoverage" != "yes" && "$ieventsCoverage" != "no" ) || ( "$fragDist" != "yes" && "$fragDist" != "no" ) || ( "$callpeak" != "yes" && "$callpeak" != "no" ) || ( "$extractReads" != "yes" && "$extractReads" != "no" ) || ( "$blacklist" != "yes" && "$blacklist" != "no" ) || ( "$shift" != "yes" && "$shift" != "no" ) ]] ; then 
+	>&2 echo -e "\n[ERROR]: Possible values to turn on a section/option: yes/no. Exit." ; exit 1 
 fi
 
-if [ -d $OUTDIR ]; then >&2 echo "[WARNING]: Output directory ($OUTDIR) already exists. Results will be overwitten." ;fi
+
 
 #check if BAM option is filled when map=no. If BAM is filled, check if a valid BAM file was given 
 if [[ "$map" == "no" && -z $BAM ]]; then 
@@ -253,6 +264,7 @@ EOL
 fi
 cat >> $LOCALTMP/tmp.conf <<EOL
 - Maximum mismatches per read: $maxMis
+- Shift reads by 4bp: $shift
 - Select concordant, non-duplicated pairs
 EOL
 fi
@@ -375,6 +387,13 @@ echo "`stamp`: Filter by allowed mismatches..." | tee -a $LOG
 $pathSamtools view -h -F 4 $BAM | awk -v n=$maxMis -v ID=$ID -v IDnreads=$IDnreads  '{if($0 ~ /^@/) {print $0} else {a++ ;  mis=match($0,"XM:i:") ; nmis=substr($0,mis+5,2) ;if (int(nmis)<=n) {print $0; b++} } }END{printf("selected-regions\t%d\nreads-selected-by-nmis\t%d\n",a,b) > IDnreads }'  | $pathSamtools sort - -o $ID.${maxMis}mis.$mask.sorted.bam -O bam -T $LOCALTMP
 fi
 
+#check if duplicates are already marked: saves time when filtering is performed on already marked reads.. 
+if [ `samtools view $ID.${maxMis}mis.$mask.sorted.bam -H | grep "MarkDuplicates" -c` -gt 0 ]; then 
+#skip marking duplicates and just rename file
+echo "`stamp`: BAM header says that duplicate reads are already marked (skip step)..." | tee -a $LOG
+mv $ID.${maxMis}mis.$mask.sorted.bam $ID.${maxMis}mis.mkdup.$mask.bam 
+
+else
 
 echo "`stamp`: Mark duplicates..." | tee -a $LOG
 echo "#$pathToJava -Xmx5g -Djava.io.tmpdir=$LOCALTMP \
@@ -389,13 +408,14 @@ $pathToJava -Xmx5g -Djava.io.tmpdir=$LOCALTMP \
 METRICS_FILE=$LOGDIR/MKDUP.$ID.${maxMis}mis.$mask.log  \
 INPUT=$ID.${maxMis}mis.$mask.sorted.bam \
 OUTPUT=$ID.${maxMis}mis.mkdup.$mask.bam 2> $LOGDIR/MKDUP.$ID.${maxMis}mis.$mask.err
+fi
 
 
 #Get number of duplicates (from the reads falling into our selected regions and carrying no more than nmis) 
 echo "`stamp`: Get stats on duplicates..." 
 nDup=`$pathSamtools view -f 1024 $ID.${maxMis}mis.mkdup.$mask.bam -c`
 
-echo "`stamp`: Select concordant, non-duplicated reads..."   | tee -a $LOG
+echo "`stamp`: Select concordant, non-duplicated reads and fix flags..."   | tee -a $LOG
 echo "#$pathSamtools view -hb -f 3 -F 1024 $ID.${maxMis}mis.mkdup.$mask.bam >  $ID.${maxMis}mis.mkdup.f3F1024.$mask.bam  " >> $LOG
  
 $pathSamtools view -hb -f 3 -F 1024 $ID.${maxMis}mis.mkdup.$mask.bam >  $ID.${maxMis}mis.mkdup.f3F1024.$mask.bam 
@@ -404,20 +424,27 @@ $pathSamtools view -hb -f 3 -F 1024 $ID.${maxMis}mis.mkdup.$mask.bam >  $ID.${ma
 if [ -s  $ID.${maxMis}mis.mkdup.f3F1024.$mask.bam ] ; then rm -f $ID.${maxMis}mis.mkdup.$mask.bam $ID.${maxMis}mis.$mask.sorted.bam ; fi
 
 #========4. Fix mates!
-echo "`stamp`: Shift reads..." 
 $pathSamtools sort -n $ID.${maxMis}mis.mkdup.f3F1024.$mask.bam -T $LOCALTMP -O bam | $pathSamtools fixmate - $ID.tmp.bam
 
-#========5. Shift reads! and sort by coordinates for indexing 
-$pathSamtools view -h -F 16 $ID.tmp.bam |  awk 'BEGIN{OFS="\t"} { if ($1 ~ /^@/) {print} else { Rlen=length($10) ; $4=$4+4 ; $8=$8-5 ; if ($8<0 && $8==0) {$8=1} ;  print $0   }}' > $ID.tmp.shifted.sam
-$pathSamtools view -f 16 $ID.tmp.bam | awk 'BEGIN{OFS="\t"} { $4=$4-5 ;if ($4<0 && $4==0) {$4=1} ;  $8=$8+4 ;  print $0 }' >> $ID.tmp.shifted.sam
-$pathSamtools view -bh $ID.tmp.shifted.sam | $pathSamtools sort - -o $ID.${maxMis}mis.mkdup.f3F1024.$mask.shifted.bam -O bam -T $LOCALTMP
+#========5. Shift reads (if yes) and sort by coordinates for indexing; otherwise, carry on  
+shift="shifted"
+if [[ $shift == "yes" ]]; then 
+echo "`stamp`: Shift reads..." 
+$pathSamtools view -h -F 16 $ID.tmp.bam |  awk 'BEGIN{OFS="\t"} { if ($1 ~ /^@/) {print} else { Rlen=length($10) ; $4=$4+4 ; $8=$8-4 ; if ($8<0 && $8==0) {$8=1} ;  print $0   }}' > $ID.tmp.$shiftTag.sam
+$pathSamtools view -f 16 $ID.tmp.bam | awk 'BEGIN{OFS="\t"} { $4=$4-4 ;if ($4<0 && $4==0) {$4=1} ;  $8=$8+4 ;  print $0 }' >> $ID.tmp.$shiftTag.sam
+$pathSamtools view -bh $ID.tmp.$shiftTag.sam | $pathSamtools sort - -o $ID.${maxMis}mis.mkdup.f3F1024.$mask.$shiftTag.bam -O bam -T $LOCALTMP
+else
+echo "`stamp`: Skip shiftting reads (shift=$shift), sort reads..." 
+shift="unshifted"
+$pathSamtools view -bh $ID.tmp.sam | $pathSamtools sort - -o $ID.${maxMis}mis.mkdup.f3F1024.$mask.$shiftTag.bam -O bam -T $LOCALTMP
+fi
 
 # index file
 echo "`stamp`: Index output bam file..."
-$pathSamtools index $ID.${maxMis}mis.mkdup.f3F1024.$mask.shifted.bam
+$pathSamtools index $ID.${maxMis}mis.mkdup.f3F1024.$mask.$shiftTag.bam
 
 #remove tmp bam file
-if [ -s $ID.${maxMis}mis.mkdup.f3F1024.$mask.shifted.bam ]; then rm -f $ID.tmp.bam $ID.tmp.shifted.sam  $ID.${maxMis}mis.mkdup.f3F1024.$mask.bam ; fi 
+if [ -s $ID.${maxMis}mis.mkdup.f3F1024.$mask.$shiftTag.bam ]; then rm -f $ID.tmp.bam $ID.tmp.$shiftTag.sam  $ID.${maxMis}mis.mkdup.f3F1024.$mask.bam ; fi 
 
 echo "`stamp`: Extract filtering stats in CSV file..."
 
@@ -463,7 +490,7 @@ echo "`stamp`: Mapped reads on Chr1-->Chr5: $nMaChr15"
 
 #----------- TOTAL READS SELECTED READS
 
-FinalReads=`$pathSamtools view $ID.${maxMis}mis.mkdup.f3F1024.$mask.shifted.bam -c`
+FinalReads=`$pathSamtools view $ID.${maxMis}mis.mkdup.f3F1024.$mask.$shiftTag.bam -c`
 echo "`stamp`: Final number of selected reads: $FinalReads"
 
 #----------------------------------------------- print all
@@ -496,7 +523,7 @@ if [[ $readCoverage == "yes" ]]; then
 if [ ! -s $pathIgvTools ]; then >&2 echo `file $pathIgvTools`  ; exit 1 ; fi
 
 	if [[ "$map" == "yes" && "$filter"=="no" ]]; then BAM=${ID}.mapped.sorted.bam ; fi
-	if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.$mask.shifted.bam ; fi
+	if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.$mask.$shiftTag.bam ; fi
 #===============================================================================
 # Compute read coverage 
 #===============================================================================
@@ -528,7 +555,7 @@ if [[ $ieventsCoverage == "yes" ]]; then
 if [ ! -s $pathIgvTools ]; then >&2 echo `file $pathIgvTools`  ; exit 1 ; fi
 
 if [[ "$map" == "yes" && "$filter" == "no" ]]; then BAM=${ID}.mapped.sorted.bam ; fi
-if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.$mask.shifted.bam ; fi
+if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.$mask.$shiftTag.bam ; fi
 
 #===============================================================================
 # Compute insertion event coverage
@@ -576,7 +603,7 @@ if [[ "$fragDist" == "yes" ]]; then
 if [ ! -s $pathSamtools ]; then >&2 echo `file $pathSamtools`  ; exit 1 ; fi
 #get correct BAM file (user-provided or created)
 if [[ "$map" == "yes" && "$filter" == "no" ]]; then BAM=${ID}.mapped.sorted.bam ; fi
-if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.$mask.shifted.bam ; fi
+if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.$mask.$shiftTag.bam ; fi
 
 #===============================================================================
 # Compute fragment length distribution
@@ -636,7 +663,7 @@ if [[ "$extractReads" == "yes" ]]; then
 if [ ! -s $pathSamtools ]; then >&2 echo `file $pathSamtools`  ; exit 1 ; fi
 #get correct BAM file (user-provided or created)
 if [[ "$map" == "yes" && "$filter" == "no" ]]; then BAM=${ID}.mapped.sorted.bam ; fi
-if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.$mask.shifted.bam ; fi
+if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.$mask.$shiftTag.bam ; fi
 
 #===============================================================================
 # Extract read pairs based on a range of fragment length 
@@ -660,7 +687,7 @@ echo "`stamp`: Sort and index extracted reads..."
 cat $header $subSetSam | $pathSamtools view -bh - | $pathSamtools sort - -O bam -o $subSetBam -T $LOCALTMP 
 
 N=`$pathSamtools view $subSetBam -c`
-echo "`stamp`: Worte $N reads in $subSetBam"
+echo "`stamp`: Extracted $N reads in $subSetBam"
 fi
 
 #===============================================================================
@@ -671,7 +698,7 @@ if [ ! -s $pathMACS2 ]; then >&2 echo `file $pathMACS2`  ; exit 1 ; fi
 
 #get correct BAM file (user-provided or created)
 if [[ "$map" == "yes" && "$filter" == "no" ]]; then BAM=${ID}.mapped.sorted.bam ; fi
-if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.$mask.shifted.bam ; fi
+if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.$mask.$shiftTag.bam ; fi
 #===============================================================================
 # Peak calling
 #===============================================================================
