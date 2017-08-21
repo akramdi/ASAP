@@ -119,7 +119,7 @@ Filtering parameters
 
 :blacklistedRegions:         Regions used to filter reads.(tab-delimited format: <Chr name><start><end>)
 
-
+:shift:                      Set to "yes"/"no". If *shift=yes*, reads are shifted by 4bp so that read starts reflect the center of the Tn5 transposition event
 
 Coverage
 ---------
