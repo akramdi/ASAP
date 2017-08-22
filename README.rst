@@ -18,7 +18,7 @@ Overview of major steps
   - Select reads that do not carry more than minMismatch
   - Mark duplicated pairs
   - Select concordant, non-duplicated pairs. 
-  - Shift read pairs as described in Buenorestro et al.,2013
+  - Shift reads by 4bp as described in Schep et al.,2015
 - Compute read coverage
 - Compute insertion events coverage
 - Fragment length distribution
