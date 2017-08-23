@@ -430,8 +430,8 @@ $pathSamtools sort -n $ID.${maxMis}mis.mkdup.f3F1024.$mask.bam -T $LOCALTMP -O b
 shift="shifted"
 if [[ $shift == "yes" ]]; then 
 echo "`stamp`: Shift reads..." 
-$pathSamtools view -h -F 16 $ID.tmp.bam |  awk 'BEGIN{OFS="\t"} { if ($1 ~ /^@/) {print} else { Rlen=length($10) ; $4=$4+4 ; $8=$8-4 ; if ($8<0 && $8==0) {$8=1} ;  print $0   }}' > $ID.tmp.$shiftTag.sam
-$pathSamtools view -f 16 $ID.tmp.bam | awk 'BEGIN{OFS="\t"} { $4=$4-4 ;if ($4<0 && $4==0) {$4=1} ;  $8=$8+4 ;  print $0 }' >> $ID.tmp.$shiftTag.sam
+$pathSamtools view -h -F 16 $ID.tmp.bam |  awk 'BEGIN{OFS="\t"} { if ($1 ~ /^@/) {print} else { Rlen=length($10) ; $4=$4+4 ; $8=$8-4 ; if ($8<0 && $8==0) {$8=1} ;  $9=$9-8; print $0   }}' > $ID.tmp.$shiftTag.sam
+$pathSamtools view -f 16 $ID.tmp.bam | awk 'BEGIN{OFS="\t"} { $4=$4-4 ;if ($4<0 && $4==0) {$4=1} ;  $8=$8+4 ; $9=$9-8; print $0 }' >> $ID.tmp.$shiftTag.sam
 $pathSamtools view -bh $ID.tmp.$shiftTag.sam | $pathSamtools sort - -o $ID.${maxMis}mis.mkdup.f3F1024.$mask.$shiftTag.bam -O bam -T $LOCALTMP
 else
 echo "`stamp`: Skip shiftting reads (shift=$shift), sort reads..." 
