@@ -217,12 +217,12 @@ if [[ ! -z $peakCallingControl && ! -s $peakCallingControl ]]; then
 fi
 
 # Create a coverage directory if any of the coverage steps are turned on: 
-COVDIR=$OUTDIR/Coverage_${ID}
-if [[ ( "$readCoverage" == "yes" || "$ieventsCoverage" == "yes" ) && ! -d $COVDIR ]]; then mkdir $COVDIR ;fi 
+#COVDIR=$OUTDIR/Coverage_${ID}
+#if [[ ( "$readCoverage" == "yes" || "$ieventsCoverage" == "yes" ) && ! -d $COVDIR ]]; then mkdir $COVDIR ;fi 
 
 #Create fragment dist directory
-FRAGDIR=$OUTDIR/Fragment_distribution_${ID}
-if [[  "$fragDist" == "yes" && ! -d $FRAGDIR ]]; then mkdir $FRAGDIR ;fi 
+#FRAGDIR=$OUTDIR/Fragment_distribution_${ID}
+#if [[  "$fragDist" == "yes" && ! -d $FRAGDIR ]]; then mkdir $FRAGDIR ;fi 
 
 
 
@@ -325,7 +325,8 @@ if [ ! -s $pathBowtie2 ]; then >&2 echo `file $pathBowtie2`  ; exit 1 ; fi
 #===============================================================================
 # Mapping step
 #===============================================================================
-echo -e "\n######################## Mappinng step" | tee -a $LOG
+echo -e "\n######################## Mappinng step"
+echo -e "\n######################## Mappinng step" > $LOG
 
 echo "`stamp`: Mapping..." | tee -a $LOG
 echo "`stamp`: Mapping command: #$pathBowtie2 -x $bowtieIndex $mappingParameters -1 $FASTQ1 -2 $FASTQ2 1> ${ID}.mapped.sam" | tee -a $LOG
@@ -427,7 +428,7 @@ if [ -s  $ID.${maxMis}mis.mkdup.f3F1024.$mask.bam ] ; then rm -f $ID.${maxMis}mi
 $pathSamtools sort -n $ID.${maxMis}mis.mkdup.f3F1024.$mask.bam -T $LOCALTMP -O bam | $pathSamtools fixmate - $ID.tmp.bam
 
 #========5. Shift reads (if yes) and sort by coordinates for indexing; otherwise, carry on  
-shift="shifted"
+shiftTag="shifted"
 if [[ $shift == "yes" ]]; then 
 echo "`stamp`: Shift reads..." 
 $pathSamtools view -h -F 16 $ID.tmp.bam |  awk 'BEGIN{OFS="\t"} { if ($1 ~ /^@/) {print} else { Rlen=length($10) ; $4=$4+4 ; $8=$8-4 ; if ($8<0 && $8==0) {$8=1} ;  $9=$9-8; print $0   }}' > $ID.tmp.$shiftTag.sam
@@ -435,8 +436,8 @@ $pathSamtools view -f 16 $ID.tmp.bam | awk 'BEGIN{OFS="\t"} { $4=$4-4 ;if ($4<0 
 $pathSamtools view -bh $ID.tmp.$shiftTag.sam | $pathSamtools sort - -o $ID.${maxMis}mis.mkdup.f3F1024.$mask.$shiftTag.bam -O bam -T $LOCALTMP
 else
 echo "`stamp`: Skip shiftting reads (shift=$shift), sort reads..." 
-shift="unshifted"
-$pathSamtools view -bh $ID.tmp.sam | $pathSamtools sort - -o $ID.${maxMis}mis.mkdup.f3F1024.$mask.$shiftTag.bam -O bam -T $LOCALTMP
+shiftTag="unshifted"
+$pathSamtools view -bh $ID.tmp.bam | $pathSamtools sort - -o $ID.${maxMis}mis.mkdup.f3F1024.$mask.$shiftTag.bam -O bam -T $LOCALTMP
 fi
 
 # index file
@@ -496,7 +497,7 @@ echo "`stamp`: Final number of selected reads: $FinalReads"
 #----------------------------------------------- print all
 title="SAMPLE,Total_reads_fastq,Total_mapped_reads,Mapped_on_ChM,Mapped_on_ChC,Mapped_on_ChM-ChrC,Mapped_on_Chr1-5,Total_mapped_selected_reads,Total_mapped_selected_reads_${maxMis}mis,Total_mapped_selected_reads_${maxMis}mis_dup,Final_reads"
 
-outcsv=$OUTDIR/$ID.filter.stats.csv
+outcsv=$OUTDIR/$ID.filter.stats.$mask.$shiftTag.csv
 
 cat > $outcsv <<EOF
 #Total_reads_fastq: total sequenced read
@@ -530,8 +531,9 @@ if [ ! -s $pathIgvTools ]; then >&2 echo `file $pathIgvTools`  ; exit 1 ; fi
 echo -e "\n######################## Compute read coverage (using BAM:$BAM)" | tee -a $LOG
 
 #outputs
-BEDGRAPH=${BAM/.bam/.bedgraph}
-TDF=${BAM/.bam/.tdf}
+base=`basename $BAM`
+BEDGRAPH=${base/.bam/.bedgraph}
+TDF=${base/.bam/.tdf}
 
 
 echo "`stamp`: Get bedgraph..."
@@ -543,8 +545,10 @@ if [ -s $TDF ]; then rm -f $BEDGRAPH ; fi
 rm -f igv.log
 
 #mv output to Coverage dir
-mv $TDF $COVDIR
-echo "`stamp`: Wrote coverage file: $COVDIR/$TDF "
+#mv $TDF $COVDIR
+#echo "`stamp`: Wrote coverage file: $COVDIR/$TDF "
+echo "`stamp`: Wrote coverage file: $TDF "
+
 
 fi
 
@@ -564,9 +568,10 @@ echo -e "\n######################## Create insertion event BAM files and compute
 
 
 #outputs
-OUTBAM=${BAM/.bam/.ievent.bam}
-BEDGRAPH=${BAM/.bam/.ievent.bedgraph}
-TDF=${BAM/.bam/.ievent.tdf}
+base=`basename $BAM`
+OUTBAM=${base/.bam/.ievent.bam}
+BEDGRAPH=${base/.bam/.ievent.bedgraph}
+TDF=${base/.bam/.ievent.tdf}
 
 echo "`stamp`: Extract insertion events..." | tee -a $LOG
 
@@ -592,8 +597,8 @@ if [ -s $TDF ]; then rm -f $BEDGRAPH ; fi
 rm -f igv.log
 
 #mv output to Coverage dir
-mv $TDF $COVDIR
-echo "`stamp`: Wrote coverage of insertion events: $COVDIR/$TDF "
+#mv $TDF $COVDIR
+echo "`stamp`: Wrote coverage of insertion events: $TDF "
 
 fi
 
@@ -602,8 +607,8 @@ fi
 if [[ "$fragDist" == "yes" ]]; then 
 if [ ! -s $pathSamtools ]; then >&2 echo `file $pathSamtools`  ; exit 1 ; fi
 #get correct BAM file (user-provided or created)
-if [[ "$map" == "yes" && "$filter" == "no" ]]; then BAM=${ID}.mapped.sorted.bam ; fi
-if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.$mask.$shiftTag.bam ; fi
+	if [[ "$map" == "yes" && "$filter" == "no" ]]; then BAM=${ID}.mapped.sorted.bam ; fi
+	if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.$mask.$shiftTag.bam ; fi
 
 #===============================================================================
 # Compute fragment length distribution
@@ -611,21 +616,27 @@ if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.$mask.$shif
 echo -e "\n######################## Compute fragment length distribution (using BAM:$BAM)" | tee -a $LOG
 
 #create dir for fragment length
-if [ ! -d $OUTDIR/Fragment_distribution_${ID} ]; then mkdir $OUTDIR/Fragment_distribution_${ID} ; fi 
+#if [ ! -d $OUTDIR/Fragment_distribution_${ID} ]; then mkdir $OUTDIR/Fragment_distribution_${ID} ; fi 
 
-echo "`stamp`: Extraction of fragment length... " | tee -a $LOG
-#meaning of flag 66 -> 64 (first in pair) + 2 (read mapped in proper pair. Because we still have reads with no 2nd mate (*/=) and fixmate puts a TLEN=0 in this case)
-echo "$pathSamtools view $BAM -f 66 |  awk -v tot=$LOCALTMP/tot.tmp ' function abs(v) {return v < 0 ? -v : v}  {s++; print abs($9)} END {print s > tot }' | sort - -T $LOCALTMP | uniq -c |sort -k2 -g > TLEN.$ID.f66.txt " >> $LOG
-$pathSamtools view $BAM -f 66 |  awk -v tot=$LOCALTMP/tot.tmp ' function abs(v) {return v < 0 ? -v : v}  {s++; print abs($9)} END {print s > tot }' | sort - -T $LOCALTMP | uniq -c |sort -k2 -g > TLEN.$ID.f66.txt 
+#names for fragment dist txt file/png file
+base=`basename $BAM`
+TLENTXT=${base/.bam/.TLEN.f66.txt}
+TLENPNG=${base/.bam/.TLEN.f66.png}
+
+
+
+echo "$pathSamtools view $BAM -f 66 |  awk -v tot=$LOCALTMP/tot.tmp ' function abs(v) {return v < 0 ? -v : v}  {s++; print abs($9)} END {print s > tot }' | sort - -T $LOCALTMP | uniq -c |sort -k2 -g > $TLENTXT" >> $LOG
+$pathSamtools view $BAM -f 66 |  awk -v tot=$LOCALTMP/tot.tmp ' function abs(v) {return v < 0 ? -v : v}  {s++; print abs($9)} END {print s > tot }' | sort - -T $LOCALTMP | uniq -c |sort -k2 -g > $TLENTXT 
 
 #Convert counts to frequencies:
 tot=`awk '{print $1}' $LOCALTMP/tot.tmp`
-awk -v tot=$tot 'BEGIN{OFS="\t"; print "#TLEN\tcount\tFreq"} {printf ("%d\t%d\t%f\n",$2,$1,$1/tot)}'  TLEN.$ID.f66.txt > tmp ; mv tmp TLEN.$ID.f66.txt
+awk -v tot=$tot 'BEGIN{OFS="\t"; print "#TLEN\tcount\tFreq"} {printf ("%d\t%d\t%f\n",$2,$1,$1/tot)}'  $TLENTXT > tmp ; mv tmp $TLENTXT
+
 
 echo "`stamp`: Plot fragment length distribution... "
 gnuplot << EOF
 set term pngcairo size 1024,768
-set output "TLEN.$ID.f66.png"
+set output "$TLENPNG"
 set nokey
 
 set datafile commentschars "#"
@@ -648,11 +659,12 @@ set xtics rotate by 315 offset -1,0
 #set arrow from 2,graph(0,0) to 2,graph(1,1) nohead
 #plot 'TLEN.$ID.f66.txt' title "" with points pt 7 ps 0.1
 
-plot 'TLEN.$ID.f66.txt' using 1:3 with lines
+plot "$TLENTXT" using 1:3 with lines
 EOF
 #move outputs to directory
-mv  TLEN.$ID.f66.txt TLEN.$ID.f66.png $FRAGDIR
-echo "`stamp`: Wrote $FRAGDIR/TLEN.$ID.f66.txt ; $FRAGDIR/TLEN.$ID.f66.png"
+#mv  TLEN.$ID.f66.txt TLEN.$ID.f66.png $FRAGDIR
+#echo "`stamp`: Wrote $FRAGDIR/TLEN.$ID.f66.txt ; $FRAGDIR/TLEN.$ID.f66.png"
+echo "`stamp`: Wrote $TLENTXT ; $TLENPNG"
 fi
 
 #===============================================================================
@@ -662,16 +674,20 @@ fi
 if [[ "$extractReads" == "yes" ]]; then 
 if [ ! -s $pathSamtools ]; then >&2 echo `file $pathSamtools`  ; exit 1 ; fi
 #get correct BAM file (user-provided or created)
-if [[ "$map" == "yes" && "$filter" == "no" ]]; then BAM=${ID}.mapped.sorted.bam ; fi
-if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.$mask.$shiftTag.bam ; fi
+	if [[ "$map" == "yes" && "$filter" == "no" ]]; then BAM=${ID}.mapped.sorted.bam ; fi
+	if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.$mask.$shiftTag.bam ; fi
 
 #===============================================================================
 # Extract read pairs based on a range of fragment length 
 #===============================================================================
 echo -e "\n######################## Extract reads based on fragment length range (using BAM:$BAM)" | tee -a $LOG
 # Create output bam name:
-subSetSam=$LOCALTMP/$ID.subReads.f3.frag-${lowBoundary}-${upBoundary}.sam
-subSetBam=$ID.subReads.f3.frg-${lowBoundary}-${upBoundary}.bam
+base=`basename $BAM`
+baseNoex=${base%.bam}
+
+subSetSam=$LOCALTMP/$baseNoex.subReads.f3.frag-${lowBoundary}-${upBoundary}.sam
+subSetBam=$baseNoex.subReads.f3.frag-${lowBoundary}-${upBoundary}.bam
+
 header=$LOCALTMP/header.txt ; touch $header
 
 echo "`stamp`: Extract properly paired reads (-f3) with fragment lengths [ $lowBoundary , $upBoundary ]..." | tee -a $LOG
@@ -685,9 +701,24 @@ if (abs($9) >= low && abs($9) <= up) {print $0 > out }}'
 
 echo "`stamp`: Sort and index extracted reads..."
 cat $header $subSetSam | $pathSamtools view -bh - | $pathSamtools sort - -O bam -o $subSetBam -T $LOCALTMP 
+$pathSamtools index $subSetBam
 
 N=`$pathSamtools view $subSetBam -c`
 echo "`stamp`: Extracted $N reads in $subSetBam"
+
+#compute coverage of extracted bam file
+BEDGRAPH=${subSetBam/.bam/.bedgraph}
+TDF=${subSetBam/.bam/.tdf}
+
+echo "`stamp`: Get coverage file (.tdf)..." | tee -a $LOG
+echo "$pathGenomeCoverageBed -ibam $subSetBam -g $CHRLEN -bga -trackline > $BEDGRAPH" >> $LOG
+echo "$pathIgvTools toTDF $BEDGRAPH $TDF $GENOME" >> $LOG
+
+$pathGenomeCoverageBed -ibam $subSetBam -g $CHRLEN -bga -trackline > $BEDGRAPH
+$pathIgvTools toTDF $BEDGRAPH $TDF $GENOME 1>> $LOG 2>&1
+if [ -s $TDF ]; then rm -f $BEDGRAPH ; fi  
+rm -f igv.log
+
 fi
 
 #===============================================================================
