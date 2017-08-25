@@ -161,27 +161,27 @@ Mapping output
 Filtering/post-processing outputs
 ---------------------------------
 
-:*.masked.shifted.bam: Contains the selected set of reads after filtering. Ideally, accessible peaks are called using this file. 
+:*.(un)masked.(un)shifted.bam: Contains the selected set of reads after filtering. Ideally, accessible peaks are called using this file. 
 
-:*.filter.stats.csv: Summary of filtering step is CSV format
+:*.csv: Summary of filtering step is CSV format
 
 Coverage outputs
 ----------------
-:*.masked.shifted.tdf: Genome-wide coverage of ATAC reads 
-:*.masked.shifted.ievent.tdf: Genome-wide coverage of Tn5 insertion events
+:*.(un)masked.(un)shifted.tdf: Genome-wide coverage of ATAC reads 
+:*.(un)masked.(un)shifted.ievent.tdf: Genome-wide coverage of Tn5 insertion events
 
-:*.masked.shifted.ievent.bam: Contains Tn5 insertion events. Basically, instead of showing reads, only the position corresponding to Tn5 insertion event are shown)
+:*.(un)masked.(un)shifted.ievent.bam: Contains Tn5 insertion events. Basically, instead of showing reads, only the position corresponding to Tn5 insertion event are shown)
 
 
 Fragment length distribution
 ----------------------------
-:TLEN.{sampleName}.f66.txt: Counts/frequencies of fragments length
-:TLEN.{sampleName}.f66.txt: Plot of fragment length distribution
+:*.TLEN.f66.txt: Counts/frequencies of fragments length
+:*.TLEN.f66.png: Plot of fragment length distribution
 
 Read extraction
 ---------------
 :*.subReads.f3.frag*.bam: Contains the set of extracted reads based on the given rage of fragment length
-
+:*.subReads.f3.frag*.bam: Genome-wide coverage of the set of extracted reads based on the given rage of fragment length
 
 Peak calling outputs 
 --------------------
