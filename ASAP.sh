@@ -25,6 +25,7 @@ readme
 
 #Here, we get the directory of this script in order to display a proper help
 #SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+VERSION="v1.0.0"
 
 #===============================================================================
 # Help setion
@@ -52,7 +53,7 @@ while getopts "hvc:" OPTION
 do
      case $OPTION in
 		v)
-		echo "ASAP - version 0.1"; exit 0
+		echo "ASAP - version $VERSION"; exit 0
 		;;
          h)
              usage
