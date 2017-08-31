@@ -17,7 +17,7 @@ Overview of major steps
   - Select reads that do not carry more than minMismatch
   - Mark duplicated pairs
   - Select concordant, non-duplicated pairs. 
-  - Shift reads by 4bp as described in Schep et al.,2015; ; shift by 4bp toward to center of the transposition event.
+  - Shift reads by 4bp as described in Schep et al.,2015: shift by 4bp toward to center of the transposition event.
 - Compute read coverage
 - Compute insertion events coverage
 - Fragment length distribution
