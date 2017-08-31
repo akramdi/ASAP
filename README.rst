@@ -1,7 +1,6 @@
 ===================================
-README for ASAP (v0.1)
+README for ASAP
 ===================================
-ASAP version 0.1
 
 Introduction 
 ============
