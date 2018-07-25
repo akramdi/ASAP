@@ -428,17 +428,18 @@ if [ -s  $ID.${maxMis}mis.mkdup.f3F1024.$mask.bam ] ; then rm -f $ID.${maxMis}mi
 #========4. Fix mates!
 $pathSamtools sort -n $ID.${maxMis}mis.mkdup.f3F1024.$mask.bam -T $LOCALTMP -O bam | $pathSamtools fixmate - $ID.tmp.bam
 
-#========5. Shift reads (if yes) and sort by coordinates for indexing; otherwise, carry on  
+#========5. Shift reads (if yes), adjust fragment length (-8) and sort by coordinates for indexing; otherwise, carry on 
 shiftTag="shifted"
 if [[ $shift == "yes" ]]; then 
 echo "`stamp`: Shift reads..." 
-$pathSamtools view -h -F 16 $ID.tmp.bam |  awk 'BEGIN{OFS="\t"} { if ($1 ~ /^@/) {print} else { Rlen=length($10) ; $4=$4+4 ; $8=$8-4 ; if ($8<0 && $8==0) {$8=1} ;  $9=$9-8; print $0   }}' > $ID.tmp.$shiftTag.sam
-$pathSamtools view -f 16 $ID.tmp.bam | awk 'BEGIN{OFS="\t"} { $4=$4-4 ;if ($4<0 && $4==0) {$4=1} ;  $8=$8+4 ; $9=$9-8; print $0 }' >> $ID.tmp.$shiftTag.sam
+#use -f3 because reads are fixed (fixmate) we have to extract the new concordant reads
+$pathSamtools view -h -f 3 -F 16 $ID.tmp.bam | awk '  function abs(v) {return v < 0 ? -v : v} BEGIN{OFS="\t"} { if ($1 ~ /^@/) {print} else { Rlen=length($10) ; $4=$4+4 ; $8=$8-4 ; if ($8<0 && $8==0) {$8=1} ;  if ($9>0) {i=1} else if ($9<0) {i=-1} else {i=0}; $9=(abs($9)-8)*i;  print $0   }}' > $ID.tmp.$shiftTag.sam
+$pathSamtools view -f 19 $ID.tmp.bam | awk ' function abs(v) {return v < 0 ? -v : v}  BEGIN{OFS="\t"} { $4=$4-4 ;if ($4<0 || $4==0) {$4=1} ;  $8=$8+4 ;  if ($9>0) {i=1} else if ($9<0) {i=-1} else {i=0}; $9=(abs($9)-8)*i; print $0 }' >> $ID.tmp.$shiftTag.sam
 $pathSamtools view -bh $ID.tmp.$shiftTag.sam | $pathSamtools sort - -o $ID.${maxMis}mis.mkdup.f3F1024.$mask.$shiftTag.bam -O bam -T $LOCALTMP
 else
 echo "`stamp`: Skip shiftting reads (shift=$shift), sort reads..." 
 shiftTag="unshifted"
-$pathSamtools view -bh $ID.tmp.bam | $pathSamtools sort - -o $ID.${maxMis}mis.mkdup.f3F1024.$mask.$shiftTag.bam -O bam -T $LOCALTMP
+$pathSamtools view -f 3 $ID.tmp.bam  -h | $pathSamtools sort - -o $ID.${maxMis}mis.mkdup.f3F1024.$mask.$shiftTag.bam -O bam -T $LOCALTMP
 fi
 
 # index file
@@ -619,15 +620,20 @@ echo -e "\n######################## Compute fragment length distribution (using 
 #create dir for fragment length
 #if [ ! -d $OUTDIR/Fragment_distribution_${ID} ]; then mkdir $OUTDIR/Fragment_distribution_${ID} ; fi 
 
+echo "`stamp`: Extraction of fragment length... "
+
 #names for fragment dist txt file/png file
 base=`basename $BAM`
-TLENTXT=${base/.bam/.TLEN.f66.txt}
-TLENPNG=${base/.bam/.TLEN.f66.png}
+TLENTXT=${base/.bam/.TLEN.f3F16.txt}
+TLENPNG=${base/.bam/.TLEN.f3F16.png}
 
 
+# meaning of flag -f 3 -F16 -> -f 3 (get pairs mapped in propoer pairs to avoid reads that do not have mates) + -F 16 (get forward reads out these selected pairs) 
+# Get the absolute value of TLEN
 
-echo "$pathSamtools view $BAM -f 66 |  awk -v tot=$LOCALTMP/tot.tmp ' function abs(v) {return v < 0 ? -v : v}  {s++; print abs($9)} END {print s > tot }' | sort - -T $LOCALTMP | uniq -c |sort -k2 -g > $TLENTXT" >> $LOG
-$pathSamtools view $BAM -f 66 |  awk -v tot=$LOCALTMP/tot.tmp ' function abs(v) {return v < 0 ? -v : v}  {s++; print abs($9)} END {print s > tot }' | sort - -T $LOCALTMP | uniq -c |sort -k2 -g > $TLENTXT 
+echo "+$pathSamtools view $BAM -f 3 -F 16 |  awk -v tot=$LOCALTMP/tot.tmp ' function abs(v) {return v < 0 ? -v : v}  {s++; print abs($9)} END {print s > tot }' | sort - -g -T $LOCALTMP | uniq -c |sort -k2 -g > $TLENTXT 
+" >> $LOG
+$pathSamtools view $BAM -f 3 -F 16 |  awk -v tot=$LOCALTMP/tot.tmp ' function abs(v) {return v < 0 ? -v : v}  {s++; print abs($9)} END {print s > tot }' | sort - -g -T $LOCALTMP | uniq -c |sort -k2 -g > $TLENTXT 
 
 #Convert counts to frequencies:
 tot=`awk '{print $1}' $LOCALTMP/tot.tmp`
@@ -663,8 +669,8 @@ set xtics rotate by 315 offset -1,0
 plot "$TLENTXT" using 1:3 with lines
 EOF
 #move outputs to directory
-#mv  TLEN.$ID.f66.txt TLEN.$ID.f66.png $FRAGDIR
-#echo "`stamp`: Wrote $FRAGDIR/TLEN.$ID.f66.txt ; $FRAGDIR/TLEN.$ID.f66.png"
+#mv  TLEN.$ID.f3F16.txt TLEN.$ID.f3F16.png $FRAGDIR
+#echo "`stamp`: Wrote $FRAGDIR/TLEN.$ID.f3F16.txt ; $FRAGDIR/TLEN.$ID.f3F16.png"
 echo "`stamp`: Wrote $TLENTXT ; $TLENPNG"
 fi
 
