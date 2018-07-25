@@ -539,7 +539,8 @@ TDF=${base/.bam/.tdf}
 
 
 echo "`stamp`: Get bedgraph..."
-$pathGenomeCoverageBed -ibam $BAM -g $CHRLEN -bga -trackline > $BEDGRAPH
+#$pathGenomeCoverageBed -ibam $BAM -g $CHRLEN -bga -trackline > $BEDGRAPH
+$pathGenomeCoverageBed -ibam $BAM -bga -trackline > $BEDGRAPH
 echo "`stamp`: Convert bedgraph to tdf..."
 $pathIgvTools toTDF $BEDGRAPH $TDF $GENOME 1>> $LOG 2>&1
 #remove bedgraph if tdf was correctly created: -s means file exists and has a non zero size
@@ -592,7 +593,8 @@ echo "`stamp`: Wrote insertion events in bam file: $OUTBAM "
 #cd $IEDIR
 echo "`stamp`: Compute ievents coverage..." | tee -a $LOG
 echo "`stamp`: Get bedgraph..."
-$pathGenomeCoverageBed -ibam $OUTBAM -g $CHRLEN -bga -trackline > $BEDGRAPH
+#$pathGenomeCoverageBed -ibam $OUTBAM -g $CHRLEN -bga -trackline > $BEDGRAPH
+$pathGenomeCoverageBed -ibam $OUTBAM -bga -trackline > $BEDGRAPH
 echo "`stamp`: Convert bedgraph to tdf... "
 $pathIgvTools toTDF $BEDGRAPH $TDF $GENOME 1>> $LOG 2>&1
 if [ -s $TDF ]; then rm -f $BEDGRAPH ; fi  
@@ -718,10 +720,11 @@ BEDGRAPH=${subSetBam/.bam/.bedgraph}
 TDF=${subSetBam/.bam/.tdf}
 
 echo "`stamp`: Get coverage file (.tdf)..." | tee -a $LOG
-echo "$pathGenomeCoverageBed -ibam $subSetBam -g $CHRLEN -bga -trackline > $BEDGRAPH" >> $LOG
+echo "$pathGenomeCoverageBed -ibam $subSetBam -bga -trackline > $BEDGRAPH" >> $LOG
 echo "$pathIgvTools toTDF $BEDGRAPH $TDF $GENOME" >> $LOG
 
-$pathGenomeCoverageBed -ibam $subSetBam -g $CHRLEN -bga -trackline > $BEDGRAPH
+#$pathGenomeCoverageBed -ibam $subSetBam -g $CHRLEN -bga -trackline > $BEDGRAPH
+$pathGenomeCoverageBed -ibam $subSetBam -bga -trackline > $BEDGRAPH
 $pathIgvTools toTDF $BEDGRAPH $TDF $GENOME 1>> $LOG 2>&1
 if [ -s $TDF ]; then rm -f $BEDGRAPH ; fi  
 rm -f igv.log
