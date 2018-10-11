@@ -2,7 +2,7 @@
 
 
 :<<'readme'
-21/06/2017
+11/10/2018
 kramdi@biologie.ens.fr
 kramdi.a@gmail.com
 
@@ -11,21 +11,21 @@ This script is written in an effort to gather the main analysis steps of ATAC-se
 I.Mapping
 II.Post-mapping processing (mark duplicate pairs) and filtering
  II.1. Filter (or not) reads that fall into user-defined blacklisted regions
- II.2. Select reads that do not carry more than minMismatch
+ II.2. Select reads that do not carry more than minMismatch. Filter by mapping quality (MAPQ)
  II.3. Select concordant, non-duplicated pairs. 
  II.4. Shift read by 4bp as described in Schep et al.,2015
 III. Compute coverage
  III.1. Compute read coverage
  III.2. Compute insertion events coverage
 IV. Compute fragment length distribution
- V. Extract read pairs based on a given range of fragment length
+ V. Extract read pairs based on a given range of fragment length and compute arcs between fragments extremities ( protection visualization)
 VI. Peak calling
 
 readme
 
 #Here, we get the directory of this script in order to display a proper help
 #SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-VERSION="v1.0.0"
+VERSION="v2"
 
 #===============================================================================
 # Help setion
@@ -104,6 +104,7 @@ config=( # set default values in config array
 [BAM]=""
 [map]=""
 [filter]=""
+[mapQual]=""
 [readCoverage]=""
 [ieventsCoverage]=""
 [callpeak]=""
@@ -124,7 +125,7 @@ config=( # set default values in config array
 [extractReads]=""
 [lowBoundary]=""
 [upBoundary]=""
-
+[arcs]=""
 )
 
 while read line
@@ -155,6 +156,7 @@ MODE=${config[MODE]}
 BAM=${config[BAM]}
 map=${config[map]}
 filter=${config[filter]}
+mapQual=${config[mapQual]}
 CHRLEN=${config[CHRLEN]}
 GENOME=${config[GENOME]}
 readCoverage=${config[readCoverage]}
@@ -172,6 +174,7 @@ pathToPicardJar=${config[pathToPicardJar]}
 extractReads=${config[extractReads]}
 lowBoundary=${config[lowBoundary]}
 upBoundary=${config[upBoundary]}
+arcs=${config[arcs]}
 
 #===============================================================================
 # Create tmp dir and LOG file
@@ -265,6 +268,7 @@ EOL
 fi
 cat >> $LOCALTMP/tmp.conf <<EOL
 - Maximum mismatches per read: $maxMis
+- Miinimum MAPQ:$mapQual
 - Shift reads by 4bp: $shift
 - Select concordant, non-duplicated pairs
 EOL
@@ -283,6 +287,7 @@ if [[ "$extractReads" == "yes" ]]; then
 cat >> $LOCALTMP/tmp.conf <<EOL
 - Lower fragment length boundary: $lowBoundary nt
 - Upper fragment length boundary: $upBoundary nt
+- Compute arcs between fragment extremities: $arcs
 EOL
 fi
 
@@ -376,7 +381,7 @@ IDnreads=$LOCALTMP/$ID.nreads.txt
 # Remove reads based on blacklisted regions (if provided) + filter by max N mismatches
 if [[ "$blacklist" == "yes" ]]; then
 ##create complement of the blacklisted regions for easy selection using samtools -L
-bedtools complement -i <(sort -k1,1 -k2,2n $blacklistedRegions) -g $CHRLEN | sort -k1,1 -k2,2n >  $LOCALTMP/selected_ATACseq_regions.bed
+bedtools complement -i <(sort -k1,1 -k2,2n $blacklistedRegions) -g <(grep -v 'ChrC\|ChrM' $CHRLEN) | sort -k1,1 -k2,2n >  $LOCALTMP/selected_ATACseq_regions.bed
 
 #Select reads that fall into our selected regions + filter by N mis
 mask="masked"
@@ -414,13 +419,13 @@ fi
 
 
 #Get number of duplicates (from the reads falling into our selected regions and carrying no more than nmis) 
-echo "`stamp`: Get stats on duplicates..." 
-nDup=`$pathSamtools view -f 1024 $ID.${maxMis}mis.mkdup.$mask.bam -c`
+#echo "`stamp`: Get stats on duplicates..." 
+#nDup=`$pathSamtools view -f 1024 $ID.${maxMis}mis.mkdup.$mask.bam -c`
 
 echo "`stamp`: Select concordant, non-duplicated reads and fix flags..."   | tee -a $LOG
-echo "#$pathSamtools view -hb -f 3 -F 1024 $ID.${maxMis}mis.mkdup.$mask.bam >  $ID.${maxMis}mis.mkdup.f3F1024.$mask.bam  " >> $LOG
+echo "#$pathSamtools view -hb -f 3 -F 1024 -q $mapQual $ID.${maxMis}mis.mkdup.$mask.bam >  $ID.${maxMis}mis.mkdup.f3F1024.$mask.bam  " >> $LOG
  
-$pathSamtools view -hb -f 3 -F 1024 $ID.${maxMis}mis.mkdup.$mask.bam >  $ID.${maxMis}mis.mkdup.f3F1024.$mask.bam 
+$pathSamtools view -hb -f 3 -F 1024 -q $mapQual $ID.${maxMis}mis.mkdup.$mask.bam >  $ID.${maxMis}mis.mkdup.f3F1024.$mask.bam  #get concordant, non-dup, mapping quality >= mapQual
 
 #remove intermediate files
 if [ -s  $ID.${maxMis}mis.mkdup.f3F1024.$mask.bam ] ; then rm -f $ID.${maxMis}mis.mkdup.$mask.bam $ID.${maxMis}mis.$mask.sorted.bam ; fi
@@ -470,11 +475,11 @@ echo "`stamp`: Mapped reads: $totalMa"
 #To get the number of reads falling into blacklisted regions, we subtract the number of reads that DID not fall into the black listed regions - total number of reads
 #BLreads=`echo "$totalFastqReads-`grep selected $IDnreads | cut -f2`" | bc`
 
-SLreads=`grep regions $IDnreads | cut -f2`
-echo "`stamp`: Reads falling into selected regions: $SLreads "
+#SLreads=`grep regions $IDnreads | cut -f2`
+#echo "`stamp`: Reads falling into selected regions: $SLreads "
 
-SLreadsMis=`grep nmis $IDnreads | cut -f2`
-echo "`stamp`: Reads selected by $maxMis mismatch(es) (among selected reads by blacklisted regions): $SLreadsMis"
+#SLreadsMis=`grep nmis $IDnreads | cut -f2`
+#echo "`stamp`: Reads selected by $maxMis mismatch(es) (among selected reads by blacklisted regions): $SLreadsMis"
 
 
 #----------- TOTAL READS THAT MAPPED TO CHRC/M
@@ -497,27 +502,38 @@ FinalReads=`$pathSamtools view $ID.${maxMis}mis.mkdup.f3F1024.$mask.$shiftTag.ba
 echo "`stamp`: Final number of selected reads: $FinalReads"
 
 #----------------------------------------------- print all
-title="SAMPLE,Total_reads_fastq,Total_mapped_reads,Mapped_on_ChM,Mapped_on_ChC,Mapped_on_ChM-ChrC,Mapped_on_Chr1-5,Total_mapped_selected_reads,Total_mapped_selected_reads_${maxMis}mis,Total_mapped_selected_reads_${maxMis}mis_dup,Final_reads"
+#title="SAMPLE,Total_reads_fastq,Total_mapped_reads,Mapped_on_ChM,Mapped_on_ChC,Mapped_on_ChM-ChrC,Mapped_on_Chr1-5,Total_mapped_selected_reads,Total_mapped_selected_reads_${maxMis}mis,Total_mapped_selected_reads_${maxMis}mis_dup,Final_reads"
+
+title="SAMPLE,Total_reads_fastq,Total_mapped_reads,Mapped_on_ChM,Mapped_on_ChrC,Mapped_on_ChM-ChrC,Mapped_on_Chr1-5,selected_reads"
 
 outcsv=$OUTDIR/$ID.filter.stats.$mask.$shiftTag.csv
 
 cat > $outcsv <<EOF
+#Mapping parameters: bowtie2 $mappingParameters
+#Blacklist: $blacklist
+,,
 #Total_reads_fastq: total sequenced read
 #Total_mapped_reads: total mapped reads
 #Mapped_on_ChM: number of reads that mapped to ChrM
-#Mapped_on_ChC:number of reads that mapped to ChrC
-#Mapped_on_ChM-ChrC: sum of number of reads that mapped to ChrM and ChC
+#Mapped_on_ChrC:number of reads that mapped to ChrC
+#Mapped_on_ChM-ChrC: sum of number of reads that mapped to ChrM and ChrC
 #Mapped_on_Chr1-5: number of reads that mapped to nuclear DNA (Chr1->Chr5)
-#Total_mapped_selected_reads: Number of selected reads after blacklist filtering. (Equals the initial number of reads if no blacklist was provided)
-#Total_mapped_selected_reads_${maxMis}mis: Number of selected reads based on maximum $maxMis mismatches
-#Total_mapped_selected_reads_${maxMis}mis_dup: Number of duplicates (reads are counted after the two previous filtering steps
-#Final_reads: Number of reads selected after filtering steps based on (i) blacklisted regions, if set (ii) mismatches (iii) non-duplicated concordant pairs
+#selected_reads: Number of reads selected after filtering steps based on (i) blacklisted regions if set (ii) mismatches, MAPQ (iii) non-duplicated concordant pairs
 ,,
 $title
-$ID,$totalFastqReads,$totalMa,$nMaChrM,$nMaChrC,$nMaChrMC,$nMaChr15,$SLreads,$SLreadsMis,$nDup,$FinalReads
+$ID,$totalFastqReads,$totalMa,$nMaChrM,$nMaChrC,$nMaChrMC,$nMaChr15,$FinalReads
 EOF
 echo "`stamp`: Wrote filtering stat in CSV format: $outcsv"
 fi
+
+
+#removed categories
+#Total_mapped_selected_reads: Number of selected reads after blacklist filtering. (Equals the initial number of reads if no blacklist was provided)
+#Total_mapped_selected_reads_${maxMis}mis: Number of selected reads based on maximum $maxMis mismatches
+#Total_mapped_selected_reads_${maxMis}mis_dup: Number of duplicates (reads are counted after the two previous filtering steps
+
+#$SLreads,$SLreadsMis,$nDup,
+
 
 #===============================================================================
 
@@ -539,7 +555,6 @@ TDF=${base/.bam/.tdf}
 
 
 echo "`stamp`: Get bedgraph..."
-#$pathGenomeCoverageBed -ibam $BAM -g $CHRLEN -bga -trackline > $BEDGRAPH
 $pathGenomeCoverageBed -ibam $BAM -bga -trackline > $BEDGRAPH
 echo "`stamp`: Convert bedgraph to tdf..."
 $pathIgvTools toTDF $BEDGRAPH $TDF $GENOME 1>> $LOG 2>&1
@@ -593,7 +608,6 @@ echo "`stamp`: Wrote insertion events in bam file: $OUTBAM "
 #cd $IEDIR
 echo "`stamp`: Compute ievents coverage..." | tee -a $LOG
 echo "`stamp`: Get bedgraph..."
-#$pathGenomeCoverageBed -ibam $OUTBAM -g $CHRLEN -bga -trackline > $BEDGRAPH
 $pathGenomeCoverageBed -ibam $OUTBAM -bga -trackline > $BEDGRAPH
 echo "`stamp`: Convert bedgraph to tdf... "
 $pathIgvTools toTDF $BEDGRAPH $TDF $GENOME 1>> $LOG 2>&1
@@ -633,7 +647,7 @@ TLENPNG=${base/.bam/.TLEN.f3F16.png}
 # meaning of flag -f 3 -F16 -> -f 3 (get pairs mapped in propoer pairs to avoid reads that do not have mates) + -F 16 (get forward reads out these selected pairs) 
 # Get the absolute value of TLEN
 
-echo "+$pathSamtools view $BAM -f 3 -F 16 |  awk -v tot=$LOCALTMP/tot.tmp ' function abs(v) {return v < 0 ? -v : v}  {s++; print abs($9)} END {print s > tot }' | sort - -g -T $LOCALTMP | uniq -c |sort -k2 -g > $TLENTXT 
+echo "$pathSamtools view $BAM -f 3 -F 16 |  awk -v tot=$LOCALTMP/tot.tmp ' function abs(v) {return v < 0 ? -v : v}  {s++; print abs($9)} END {print s > tot }' | sort - -g -T $LOCALTMP | uniq -c |sort -k2 -g > $TLENTXT 
 " >> $LOG
 $pathSamtools view $BAM -f 3 -F 16 |  awk -v tot=$LOCALTMP/tot.tmp ' function abs(v) {return v < 0 ? -v : v}  {s++; print abs($9)} END {print s > tot }' | sort - -g -T $LOCALTMP | uniq -c |sort -k2 -g > $TLENTXT 
 
@@ -715,7 +729,7 @@ $pathSamtools index $subSetBam
 N=`$pathSamtools view $subSetBam -c`
 echo "`stamp`: Extracted $N reads in $subSetBam"
 
-#compute coverage of extracted bam file
+#compute reads coverage of extracted bam file
 BEDGRAPH=${subSetBam/.bam/.bedgraph}
 TDF=${subSetBam/.bam/.tdf}
 
@@ -723,11 +737,32 @@ echo "`stamp`: Get coverage file (.tdf)..." | tee -a $LOG
 echo "$pathGenomeCoverageBed -ibam $subSetBam -bga -trackline > $BEDGRAPH" >> $LOG
 echo "$pathIgvTools toTDF $BEDGRAPH $TDF $GENOME" >> $LOG
 
-#$pathGenomeCoverageBed -ibam $subSetBam -g $CHRLEN -bga -trackline > $BEDGRAPH
 $pathGenomeCoverageBed -ibam $subSetBam -bga -trackline > $BEDGRAPH
 $pathIgvTools toTDF $BEDGRAPH $TDF $GENOME 1>> $LOG 2>&1
 if [ -s $TDF ]; then rm -f $BEDGRAPH ; fi  
 rm -f igv.log
+
+
+#compute insertion coverage of extracted bam file
+iBEDGRAPH=${subSetBam/.bam/.ievent.bedgraph}
+iTDF=${subSetBam/.bam/.ievent.tdf}
+
+echo "`stamp`: Get insertion coverage file (.tdf)..." | tee -a $LOG
+$pathGenomeCoverageBed -ibam  $subSetBam -bga -5 > $iBEDGRAPH
+$pathIgvTools toTDF $iBEDGRAPH $iTDF $GENOME 1>> $LOG 2>&1
+if [ -s $iTDF ]; then rm -f $iBEDGRAPH ; fi  
+rm -f igv.log
+
+#compute arcs between fragment extremities: useful for visualization of protection (nucleosomes) on IGV
+if [[ "$arcs" == "yes" ]]; then 
+arcFile=$baseNoex.subReads.f3.frag-${lowBoundary}-${upBoundary}.arcs.bed
+echo "`stamp`: Compute arcs between fragment extremities..." | tee -a $LOG
+echo 'track name=junctions description="fragment links from '$baseNoex'"' > $arcFile
+#about the format: https://software.broadinstitute.org/software/igv/splice_junctions
+#format: [seqname] [start] [end] [id] [score] [strand] [thickStart] [thickEnd] [r,g,b] [block_count] [block_sizes] [block_locations] #"frag"NR
+samtools view -F 16 -f 3 $subSetBam | awk 'BEGIN{OFS="\t"} {Rlen=length($10); start=$4-1 ; end=$8+Rlen ; print $3,start,end, $1, 1,"+" }' | sort -k1,1 -k2n,2 -T $LOCALTMP  >> $arcFile
+fi 
+
 
 fi
 
@@ -780,4 +815,3 @@ fi
 #============================================================================
 
 echo -e "\t=================================================================================\n\tUSER: $USER\n\tSample: $ID\n\tASAP end time: `date`\n\t================================================================================="
-
