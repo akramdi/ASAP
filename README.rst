@@ -14,14 +14,14 @@ Overview of major steps
 - Post-mapping processing and filtering:
 
   - Filter (or not) reads that fall into user-defined blacklisted regions
-  - Select reads that do not carry more than minMismatch
+  - Select reads that do not carry more than minMismatch and filter by minimum mapping quality (MAPQ)
   - Mark duplicated pairs
   - Select concordant, non-duplicated pairs. 
   - Shift reads by 4bp as described in Schep et al.,2015: shift by 4bp toward to center of the transposition event.
 - Compute read coverage
 - Compute insertion events coverage
 - Fragment length distribution
-- Extract reads pairs based on a fragment length range
+- Extract reads pairs based on a fragment length range and compute arcs between fragment extremities (protection visualization)
 - Peak calling
 
 ASAP is:
@@ -126,16 +126,17 @@ Coverage
 :ieventsCoverage:             Set to "*yes/no*" if Tn5 insertion events coverage should be computed or not
 :GENOME:                      Genome assembly. Use same genomes names as igvtools (tair10, hg38, mm9..)
 
-Fragment length
----------------
-:fragDist:                    Set to "*yes/no*" if fragment length distribution should be computed or not
-
-
 Read extraction
 ---------------
 :extractReads:                Set to "*yes/no*" if read pairs should be extracted based on a given range of fragment length
 :lowBoundary:                 Lower boundery of the range: [lowBoundary,upBoundary]. Default=100
-:upBoundary:				  Upper boundery of the range: [lowBoundary,upBoundary]. Default=250          
+:upBoundary:				          Upper boundery of the range: [lowBoundary,upBoundary]. Default=250          
+:arcs:                        set to "*yes/no*" if extracted fragments should represented as arcs (linked extremities)
+
+
+Fragment length
+---------------
+:fragDist:                    Set to "*yes/no*" if fragment length distribution should be computed or not
 
 
 Peak calling
@@ -152,35 +153,36 @@ Output files
 ============
 
 ASAP outputs mapping files, coverage files, fragments distribution table/plot and MACS2 peak calling results.
+
 Mapping output
 ---------------
 
-:*.mapped.sorted.bam:                Contains mapped reads (bowtie2 raw mapping results)
+:\*.mapped.sorted.bam:                Contains mapped reads (bowtie2 raw mapping results)
 
 Filtering/post-processing outputs
 ---------------------------------
 
-:*.(un)masked.(un)shifted.bam: Contains the selected set of reads after filtering. Ideally, accessible peaks are called using this file. 
+:\*.(un)masked.(un)shifted.bam: Contains the selected set of reads after filtering. Ideally, accessible peaks are called using this file. 
 
-:*.csv: Summary of filtering step is CSV format
+:\*.csv: Summary of filtering step is CSV format
 
 Coverage outputs
 ----------------
-:*.(un)masked.(un)shifted.tdf: Genome-wide coverage of ATAC reads 
-:*.(un)masked.(un)shifted.ievent.tdf: Genome-wide coverage of Tn5 insertion events
-
 :*.(un)masked.(un)shifted.ievent.bam: Contains Tn5 insertion events. Basically, instead of showing reads, only the position corresponding to Tn5 insertion event are shown)
+:\*.(un)masked.(un)shifted.tdf: Genome-wide coverage of ATAC reads 
+:\*.(un)masked.(un)shifted.ievent.tdf: Genome-wide coverage of Tn5 insertion events
 
-
-Fragment length distribution
-----------------------------
-:*.TLEN.f66.txt: Counts/frequencies of fragments length
-:*.TLEN.f66.png: Plot of fragment length distribution
 
 Read extraction
 ---------------
-:*.subReads.f3.frag*.bam: Contains the set of extracted reads based on the given rage of fragment length
-:*.subReads.f3.frag*.bam: Genome-wide coverage of the set of extracted reads based on the given rage of fragment length
+:\*.subReads.f3.frag*.bam: Contains the set of extracted reads based on the given rage of fragment length
+:\*.subReads.f3.frag*.tdf: Genome-wide coverage of the set of extracted reads based on the given rage of fragment length
+:\*.subReads.f3.frag*.arcs.bed: arcs between fragment extremities. This file is visualized on IGV
+
+Fragment length distribution
+----------------------------
+:\*.TLEN.f3F16.txt: Counts/frequencies of fragments length
+:\*.TLEN.f3F16.png: Plot of fragment length distribution
 
 Peak calling outputs 
 --------------------
