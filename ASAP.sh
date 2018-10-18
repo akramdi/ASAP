@@ -25,7 +25,7 @@ readme
 
 #Here, we get the directory of this script in order to display a proper help
 #SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-VERSION="v2"
+VERSION="v2.0"
 
 #===============================================================================
 # Help setion
