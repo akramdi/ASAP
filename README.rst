@@ -1,5 +1,11 @@
+
+
+
+.. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.1466008.svg
+   :target: https://doi.org/10.5281/zenodo.1466008
+   
 ===================================
-README for ASAP
+README for ASAP v2.0
 ===================================
 
 Introduction 
