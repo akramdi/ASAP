@@ -787,26 +787,26 @@ FORMAT=BAM
 if [ ! -z $peakCallingControl ]; then
 	if [[ "$MODE" == "broad" ]]; then 
 
-echo "$pathMACS2 callpeak -c $peakCallingControl -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --broad -B --trackline -q $fdr --broad-cutoff $fdr" >> $LOG
-$pathMACS2 callpeak -c $peakCallingControl -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --broad -B --trackline -q $fdr --broad-cutoff $fdr
+echo "$pathMACS2 callpeak -c $peakCallingControl -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --shift -50 --extsize 100 --broad -B --trackline -q $fdr --broad-cutoff $fdr" >> $LOG
+$pathMACS2 callpeak -c $peakCallingControl -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --shift -50 --extsize 100 --broad -B --trackline -q $fdr --broad-cutoff $fdr
 
 	elif [[ "$MODE" == "narrow" ]]; then 
 
-echo "$pathMACS2 callpeak -c $peakCallingControl -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --call-summits -B --trackline -q $fdr" >> $LOG
-$pathMACS2 callpeak -c $peakCallingControl -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --call-summits -B --trackline -q $fdr 
+echo "$pathMACS2 callpeak -c $peakCallingControl -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --shift -50 --extsize 100 --call-summits -B --trackline -q $fdr" >> $LOG
+$pathMACS2 callpeak -c $peakCallingControl -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --shift -50 --extsize 100 --call-summits -B --trackline -q $fdr 
 	fi
 
 #no control
 else
 	if [[ "$MODE" == "broad" ]]; then  
 
-echo "$pathMACS2 callpeak -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --broad -B --trackline -q $fdr --broad-cutoff $fdr " >> $LOG
-$pathMACS2 callpeak -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --broad -B --trackline -q $fdr --broad-cutoff $fdr 
+echo "$pathMACS2 callpeak -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --shift -50 --extsize 100 --broad -B --trackline -q $fdr --broad-cutoff $fdr " >> $LOG
+$pathMACS2 callpeak -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --shift -50 --extsize 100 --broad -B --trackline -q $fdr --broad-cutoff $fdr 
 
 	elif [[ "$MODE" == "narrow" ]]; then 
 
-echo "$pathMACS2 callpeak  -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --call-summits -B --trackline -q $fdr " >> $LOG
-$pathMACS2 callpeak  -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --call-summits -B --trackline -q $fdr 
+echo "$pathMACS2 callpeak  -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --shift -50 --extsize 100 --call-summits -B --trackline -q $fdr " >> $LOG
+$pathMACS2 callpeak  -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --shift -50 --extsize 100 --call-summits -B --trackline -q $fdr 
 	fi
 fi
 
