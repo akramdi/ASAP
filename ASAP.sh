@@ -504,7 +504,7 @@ echo "`stamp`: Final number of selected reads: $FinalReads"
 #----------------------------------------------- print all
 #title="SAMPLE,Total_reads_fastq,Total_mapped_reads,Mapped_on_ChM,Mapped_on_ChC,Mapped_on_ChM-ChrC,Mapped_on_Chr1-5,Total_mapped_selected_reads,Total_mapped_selected_reads_${maxMis}mis,Total_mapped_selected_reads_${maxMis}mis_dup,Final_reads"
 
-title="SAMPLE,Total_reads_fastq,Total_mapped_reads,Mapped_on_ChM,Mapped_on_ChrC,Mapped_on_ChM-ChrC,Mapped_on_Chr1-5,selected_reads"
+title="SAMPLE,Total_reads_fastq,Total_mapped_reads,Mapped_on_ChrM,Mapped_on_ChrC,Mapped_on_ChrM-ChrC,Mapped_on_Chr1-5,selected_reads"
 
 outcsv=$OUTDIR/$ID.filter.stats.$mask.$shiftTag.csv
 
