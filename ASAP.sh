@@ -24,8 +24,8 @@ VI. Peak calling
 readme
 
 #Here, we get the directory of this script in order to display a proper help
-#SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-VERSION="v2.0"
+SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+VERSION="v2.1"
 
 #===============================================================================
 # Help setion
@@ -42,7 +42,7 @@ OPTIONS:
 	-c <Parameters file>: Full set of parameters. Format and example file in : $SCRIPTDIR 
        
 
-A.KRAMDI - a2eTeam - May 2017
+A.KRAMDI - kramdi.a@gmail.com - May 2019
 		 
 EOF
 
@@ -101,6 +101,7 @@ config=( # set default values in config array
 [gsize]=""
 [fdr]=""
 [MODE]=""
+[modelParameters]=""
 [BAM]=""
 [map]=""
 [filter]=""
@@ -153,6 +154,7 @@ shift=${config[shift]}
 gsize=${config[gsize]}
 fdr=${config[fdr]}
 MODE=${config[MODE]}
+modelParameters=${config[modelParameters]}
 BAM=${config[BAM]}
 map=${config[map]}
 filter=${config[filter]}
@@ -308,6 +310,7 @@ cat >> $LOCALTMP/tmp.conf <<EOL
 - MACS2: $pathMACS2
 - $controlInfo
 - Treatement: $BAM
+- Model parameters: $modelParameters
 - Mode: $MODE
 - Cutoff for peak detection (fdr): $fdr
 - $GENOME effective genome size: 10e7
@@ -321,6 +324,48 @@ echo "++++++++++++++++++++++"
 echo -e "END PARAMETERS SUMMARY"
 echo -e "++++++++++++++++++++++\n"
 
+########################################################################################### SOME FUNCTIONS #######################################################################
+
+#==================== FUNCTION TO COMPUTE COVERAGE (BAM -> bedGraph -> bigWig)
+computeCoverage () {
+
+BAM=$1
+
+base=`basename $BAM`
+BEDGRAPH=${base/.bam/.bedgraph}
+BIGWIG=${base/.bam/.bw}
+
+echo "`stamp`: Get bedGraph..."
+$pathGenomeCoverageBed -ibam $BAM -bga -trackline > $BEDGRAPH 
+grep track $BEDGRAPH > $LOCALTMP/$BEDGRAPH.tmp && grep -v track $BEDGRAPH | sort -k1,1 -k2,2n -T $LOCALTMP  >> $LOCALTMP/$BEDGRAPH.tmp && mv $LOCALTMP/$BEDGRAPH.tmp $BEDGRAPH #sort bedGraph
+echo "`stamp`: Convert bedGraph to bigWig..."
+$SCRIPTDIR/src/bedGraphToBigWig $BEDGRAPH $CHRLEN $BIGWIG 
+
+#remove bedgraph if bigWig was correctly created: -s means file exists and has a non zero size
+if [ -s $BIGWIG ]; then rm -f $BEDGRAPH ; fi 
+
+echo "`stamp`: Wrote coverage file: $BIGWIG "
+}
+
+#==================== FUNCTION TO EXTRACT insertion events into BAM file
+extractIevents () {
+
+BAM=$1
+
+base=`basename $BAM`
+OUTBAM=${base/.bam/.ievent.bam}
+
+$pathSamtools view -h $BAM -F 16 |awk 'BEGIN{OFS="\t"}{ if ($1 ~ /^@/) {print ;} else {Rlen=length($10) ; $6=1"M"; $8=$8+Rlen-1 ; $10=substr($10,1,1);$11=substr($11,1,1); print $0 }}' > $ID.tmp.ievent.sam
+$pathSamtools view $BAM -f 16 | awk 'BEGIN{OFS="\t"}{Rlen=length($10) ; $6=1"M"; $4=$4+Rlen-1; $10=substr($10,Rlen,1) ; $11=substr($11,Rlen,1) ; print $0}' >> $ID.tmp.ievent.sam
+
+
+$pathSamtools view $ID.tmp.ievent.sam -bh | $pathSamtools sort - -o $OUTBAM -O bam -T $LOCALTMP
+$pathSamtools index $OUTBAM
+if [ -s $OUTBAM ]; then rm -f $ID.tmp.ievent.sam ; fi 
+
+echo "`stamp`: Wrote insertion events in bam file: $OUTBAM "
+}
+#==================== 
 
 ########################################################################################### MAIN #################################################################################"
 cd $OUTDIR
@@ -548,25 +593,7 @@ if [ ! -s $pathIgvTools ]; then >&2 echo `file $pathIgvTools`  ; exit 1 ; fi
 #===============================================================================
 echo -e "\n######################## Compute read coverage (using BAM:$BAM)" | tee -a $LOG
 
-#outputs
-base=`basename $BAM`
-BEDGRAPH=${base/.bam/.bedgraph}
-TDF=${base/.bam/.tdf}
-
-
-echo "`stamp`: Get bedgraph..."
-$pathGenomeCoverageBed -ibam $BAM -bga -trackline > $BEDGRAPH
-echo "`stamp`: Convert bedgraph to tdf..."
-$pathIgvTools toTDF $BEDGRAPH $TDF $GENOME 1>> $LOG 2>&1
-#remove bedgraph if tdf was correctly created: -s means file exists and has a non zero size
-if [ -s $TDF ]; then rm -f $BEDGRAPH ; fi 
-rm -f igv.log
-
-#mv output to Coverage dir
-#mv $TDF $COVDIR
-#echo "`stamp`: Wrote coverage file: $COVDIR/$TDF "
-echo "`stamp`: Wrote coverage file: $TDF "
-
+computeCoverage $BAM
 
 fi
 
@@ -582,41 +609,17 @@ if [[ "$filter" == "yes" ]]; then BAM=$ID.${maxMis}mis.mkdup.f3F1024.$mask.$shif
 #===============================================================================
 # Compute insertion event coverage
 #===============================================================================
-echo -e "\n######################## Create insertion event BAM files and compute ievent coverage (using BAM:$BAM)" | tee -a $LOG
-
-
-#outputs
-base=`basename $BAM`
-OUTBAM=${base/.bam/.ievent.bam}
-BEDGRAPH=${base/.bam/.ievent.bedgraph}
-TDF=${base/.bam/.ievent.tdf}
+echo -e "\n######################## Extract insertions events in BAM file and compute ievent coverage (using BAM:$BAM)" | tee -a $LOG
 
 echo "`stamp`: Extract insertion events..." | tee -a $LOG
-
-$pathSamtools view -h $BAM -F 16 |awk 'BEGIN{OFS="\t"}{ if ($1 ~ /^@/) {print ;} else {Rlen=length($10) ; $6=1"M"; $8=$8+Rlen-1 ; $10=substr($10,1,1);$11=substr($11,1,1); print $0 }}' > $ID.tmp.ievent.sam
-$pathSamtools view $BAM -f 16 | awk 'BEGIN{OFS="\t"}{Rlen=length($10) ; $6=1"M"; $4=$4+Rlen-1; $10=substr($10,Rlen,1) ; $11=substr($11,Rlen,1) ; print $0}' >> $ID.tmp.ievent.sam
-
-
-$pathSamtools view $ID.tmp.ievent.sam -bh | $pathSamtools sort - -o $OUTBAM -O bam -T $LOCALTMP
-$pathSamtools index $OUTBAM
-if [ -s $OUTBAM ]; then rm -f $ID.tmp.ievent.sam ; fi 
-
-echo "`stamp`: Wrote insertion events in bam file: $OUTBAM "
-
+extractIevents $BAM
 
 #then, get the coverage of insertion events
-#cd $IEDIR
 echo "`stamp`: Compute ievents coverage..." | tee -a $LOG
-echo "`stamp`: Get bedgraph..."
-$pathGenomeCoverageBed -ibam $OUTBAM -bga -trackline > $BEDGRAPH
-echo "`stamp`: Convert bedgraph to tdf... "
-$pathIgvTools toTDF $BEDGRAPH $TDF $GENOME 1>> $LOG 2>&1
-if [ -s $TDF ]; then rm -f $BEDGRAPH ; fi  
-rm -f igv.log
 
-#mv output to Coverage dir
-#mv $TDF $COVDIR
-echo "`stamp`: Wrote coverage of insertion events: $TDF "
+base=`basename $BAM`
+OUTBAM=${base/.bam/.ievent.bam}
+computeCoverage $OUTBAM
 
 fi
 
@@ -730,28 +733,15 @@ N=`$pathSamtools view $subSetBam -c`
 echo "`stamp`: Extracted $N reads in $subSetBam"
 
 #compute reads coverage of extracted bam file
-BEDGRAPH=${subSetBam/.bam/.bedgraph}
-TDF=${subSetBam/.bam/.tdf}
+echo "`stamp`: Compute coverage..." | tee -a $LOG
+computeCoverage $subSetBam
 
-echo "`stamp`: Get coverage file (.tdf)..." | tee -a $LOG
-echo "$pathGenomeCoverageBed -ibam $subSetBam -bga -trackline > $BEDGRAPH" >> $LOG
-echo "$pathIgvTools toTDF $BEDGRAPH $TDF $GENOME" >> $LOG
+#extract Insertions 
+extractIevents $subSetBam
 
-$pathGenomeCoverageBed -ibam $subSetBam -bga -trackline > $BEDGRAPH
-$pathIgvTools toTDF $BEDGRAPH $TDF $GENOME 1>> $LOG 2>&1
-if [ -s $TDF ]; then rm -f $BEDGRAPH ; fi  
-rm -f igv.log
-
-
-#compute insertion coverage of extracted bam file
-iBEDGRAPH=${subSetBam/.bam/.ievent.bedgraph}
-iTDF=${subSetBam/.bam/.ievent.tdf}
-
-echo "`stamp`: Get insertion coverage file (.tdf)..." | tee -a $LOG
-$pathGenomeCoverageBed -ibam  $subSetBam -bga -5 > $iBEDGRAPH
-$pathIgvTools toTDF $iBEDGRAPH $iTDF $GENOME 1>> $LOG 2>&1
-if [ -s $iTDF ]; then rm -f $iBEDGRAPH ; fi  
-rm -f igv.log
+#compute insertion coverage
+OUTBAM=${subSetBam/.bam/.ievent.bam}
+computeCoverage $OUTBAM
 
 #compute arcs between fragment extremities: useful for visualization of protection (nucleosomes) on IGV
 if [[ "$arcs" == "yes" ]]; then 
@@ -784,29 +774,30 @@ echo -e "\n######################## MACS2 Peak calling (using BAM:$BAM)" | tee -
 FORMAT=BAM 
 
 #commands with and without control for both broad and narrow mode
+modelParameters=`echo $modelParameters | tr -d '"'` #remove "" because macs2 does not like them, even with eval
 if [ ! -z $peakCallingControl ]; then
 	if [[ "$MODE" == "broad" ]]; then 
 
-echo "$pathMACS2 callpeak -c $peakCallingControl -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --shift -50 --extsize 100 --broad -B --trackline -q $fdr --broad-cutoff $fdr" >> $LOG
-$pathMACS2 callpeak -c $peakCallingControl -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --shift -50 --extsize 100 --broad -B --trackline -q $fdr --broad-cutoff $fdr
+echo "$pathMACS2 callpeak -c $peakCallingControl -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all $modelParameters --broad -B --trackline -q $fdr --broad-cutoff $fdr" >> $LOG
+$pathMACS2 callpeak -c $peakCallingControl -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all $modelParameters --broad -B --trackline -q $fdr --broad-cutoff $fdr
 
 	elif [[ "$MODE" == "narrow" ]]; then 
 
-echo "$pathMACS2 callpeak -c $peakCallingControl -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --shift -50 --extsize 100 --call-summits -B --trackline -q $fdr" >> $LOG
-$pathMACS2 callpeak -c $peakCallingControl -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --shift -50 --extsize 100 --call-summits -B --trackline -q $fdr 
+echo "$pathMACS2 callpeak -c $peakCallingControl -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all $modelParameters --call-summits -B --trackline -q $fdr" >> $LOG
+$pathMACS2 callpeak -c $peakCallingControl -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all $modelParameters --call-summits -B --trackline -q $fdr 
 	fi
 
 #no control
 else
 	if [[ "$MODE" == "broad" ]]; then  
 
-echo "$pathMACS2 callpeak -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --shift -50 --extsize 100 --broad -B --trackline -q $fdr --broad-cutoff $fdr " >> $LOG
-$pathMACS2 callpeak -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --shift -50 --extsize 100 --broad -B --trackline -q $fdr --broad-cutoff $fdr 
+echo "$pathMACS2 callpeak -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all $modelParameters --broad -B --trackline -q $fdr --broad-cutoff $fdr " >> $LOG
+$pathMACS2 callpeak -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all $modelParameters --broad -B --trackline -q $fdr --broad-cutoff $fdr
 
 	elif [[ "$MODE" == "narrow" ]]; then 
 
-echo "$pathMACS2 callpeak  -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --shift -50 --extsize 100 --call-summits -B --trackline -q $fdr " >> $LOG
-$pathMACS2 callpeak  -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all --nomodel --shift -50 --extsize 100 --call-summits -B --trackline -q $fdr 
+echo "$pathMACS2 callpeak  -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all $modelParameters --call-summits -B --trackline -q $fdr " >> $LOG
+$pathMACS2 callpeak  -t $BAM -n "${ID}_${MODE}_nomodel" -g $gsize  -f $FORMAT  --outdir $OUTPC --keep-dup all $modelParameters --call-summits -B --trackline -q $fdr 
 	fi
 fi
 
@@ -815,3 +806,4 @@ fi
 #============================================================================
 
 echo -e "\t=================================================================================\n\tUSER: $USER\n\tSample: $ID\n\tASAP end time: `date`\n\t================================================================================="
+
