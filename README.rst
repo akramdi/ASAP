@@ -44,7 +44,7 @@ Dependencies
 * `MACS2 <https://github.com/taoliu/MACS>`_ 
 * `Samtools <http://samtools.sourceforge.net/>`_ version >=1.2
 *  `GenomeCoverageBed <http://bedtools.readthedocs.io/en/latest/index.html>`_  version >= v2.20.1
-* `igvtools <https://software.broadinstitute.org/software/igv/igvtools>`_  IGV Version >= 2.3.72
+
 
 
 Usage of ASAP
@@ -130,7 +130,6 @@ Coverage
 ---------
 :readCoverage:                Set to "*yes/no*" if read coverage should be computed or not
 :ieventsCoverage:             Set to "*yes/no*" if Tn5 insertion events coverage should be computed or not
-:GENOME:                      Genome assembly. Use same genomes names as igvtools (tair10, hg38, mm9..)
 
 Read extraction
 ---------------
@@ -150,6 +149,7 @@ Peak calling
 :callpeak:                     Set to "yes/no" if peak calling should be computed or not.
 :control:                      Control bam file. Note that peak calling can be performed without a control, however, one can                            provide a control such as ATAC-seq on genomic DNA. Leave option empty if no control is used.
 :MODE:                         Peak calling mode: *<broad/narrow>*. Default=broad
+:modelParameters:              MACS2 shifting options
 :fdr:                          Cutoff for peak detection. Default=0.01
 :gsize:                        Effective genome size of tair10 (gsize=10e7)
 
@@ -175,14 +175,14 @@ Filtering/post-processing outputs
 Coverage outputs
 ----------------
 :*.(un)masked.(un)shifted.ievent.bam: Contains Tn5 insertion events. Basically, instead of showing reads, only the position corresponding to Tn5 insertion event are shown)
-:\*.(un)masked.(un)shifted.tdf: Genome-wide coverage of ATAC reads 
-:\*.(un)masked.(un)shifted.ievent.tdf: Genome-wide coverage of Tn5 insertion events
+:\*.(un)masked.(un)shifted.bw: Genome-wide coverage of ATAC reads 
+:\*.(un)masked.(un)shifted.ievent.bw: Genome-wide coverage of Tn5 insertion events
 
 
 Read extraction
 ---------------
 :\*.subReads.f3.frag*.bam: Contains the set of extracted reads based on the given rage of fragment length
-:\*.subReads.f3.frag*.tdf: Genome-wide coverage of the set of extracted reads based on the given rage of fragment length
+:\*.subReads.f3.frag*.bw: Genome-wide coverage of the set of extracted reads based on the given rage of fragment length
 :\*.subReads.f3.frag*.arcs.bed: arcs between fragment extremities. This file is visualized on IGV
 
 Fragment length distribution
