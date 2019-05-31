@@ -5,7 +5,7 @@
    :target: https://doi.org/10.5281/zenodo.1466008
    
 ===================================
-README for ASAP v2.0
+README for ASAP v2.1
 ===================================
 
 Introduction 
